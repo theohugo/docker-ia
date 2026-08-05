@@ -1,0 +1,98 @@
+version: "3"
+
+vars:
+  PYTHON: uv run python
+
+tasks:
+  setup:
+    desc: Install all dependencies from the lockfile
+    cmds:
+      - uv sync --locked
+
+  run:
+    desc: Run Django locally (SQLite and local Redis by default)
+    env:
+      DATABASE_URL: sqlite:///{{.ROOT_DIR}}/db.sqlite3
+      REDIS_URL: redis://127.0.0.1:6379/0
+    cmds:
+      - "{{.PYTHON}} manage.py migrate"
+      - "{{.PYTHON}} manage.py runserver"
+
+  worker:
+    desc: Run the Celery worker locally
+    env:
+      DATABASE_URL: sqlite:///{{.ROOT_DIR}}/db.sqlite3
+      REDIS_URL: redis://127.0.0.1:6379/0
+    cmds:
+      - uv run celery -A config worker --loglevel=INFO
+
+  check:
+    desc: Run Django checks, lint, formatting validation and tests
+    cmds:
+      - "{{.PYTHON}} manage.py check"
+      - "{{.PYTHON}} manage.py makemigrations --check --dry-run"
+      - task: lint
+      - task: test
+      - docker compose --env-file .env.example config --quiet
+
+  lint:
+    desc: Check code style and formatting
+    cmds:
+      - uv run ruff check .
+      - uv run black --check .
+
+  format:
+    desc: Apply Ruff fixes and Black formatting
+    cmds:
+      - uv run ruff check --fix .
+      - uv run black .
+
+  test:
+    desc: Run the Django test suite with coverage
+    env:
+      DATABASE_URL: sqlite:///:memory:
+      REDIS_URL: redis://127.0.0.1:6379/0
+      CELERY_TASK_ALWAYS_EAGER: "True"
+    cmds:
+      - uv run coverage run manage.py test
+      - uv run coverage report
+
+  migrations:
+    desc: Create and apply Django migrations
+    cmds:
+      - "{{.PYTHON}} manage.py makemigrations"
+      - "{{.PYTHON}} manage.py migrate"
+
+  docker:up:
+    desc: Build and start the complete local stack
+    cmds:
+      - docker compose up --build
+
+  docker:check:
+    desc: Run every quality check in an isolated uv/Python container
+    cmds:
+      - >-
+        docker run --rm --entrypoint sh
+        -e UV_PROJECT_ENVIRONMENT=/tmp/cadria-venv
+        -e UV_CACHE_DIR=/tmp/uv-cache
+        -e RUFF_CACHE_DIR=/tmp/ruff-cache
+        -e COVERAGE_FILE=/tmp/.coverage
+        -e PYTHONDONTWRITEBYTECODE=1
+        -e DATABASE_URL=sqlite:///:memory:
+        -e REDIS_URL=redis://127.0.0.1:6379/0
+        -e CELERY_TASK_ALWAYS_EAGER=True
+        -e DJANGO_SECRET_KEY=docker-quality-check-only
+        -v "{{.ROOT_DIR}}:/app:ro"
+        -w /app
+        ghcr.io/astral-sh/uv:0.8.17-python3.13-bookworm-slim
+        -c "uv sync --locked && uv run ruff check . && uv run black --check . && uv run python manage.py check && uv run python manage.py makemigrations --check --dry-run && uv run coverage run manage.py test && uv run coverage report"
+
+  docker:down:
+    desc: Stop containers without deleting persistent volumes
+    cmds:
+      - docker compose down
+
+  docker:logs:
+    desc: Follow web and worker logs
+    cmds:
+      - docker compose logs --follow web worker

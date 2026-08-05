@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Erreur temporaire · CadrIA{% endblock %}
+{% block body_class %}error-page{% endblock %}
+{% block content %}
+<section class="error-screen shell">
+    <div class="error-code" aria-hidden="true">500</div>
+    <p class="eyebrow"><span></span> Un pli dans le plan</p>
+    <h1>Quelque chose n’a<br>pas tenu debout.</h1>
+    <p>Une erreur inattendue est survenue. Vos briefs restent enregistrés. Revenez à l’accueil ou réessayez dans quelques instants.</p>
+    <a class="button button--primary button--large" href="/">Revenir à l’accueil</a>
+</section>
+{% endblock %}

@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: test_cadria
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test_cadria"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ci-only-not-a-production-secret
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      DATABASE_URL: postgresql://test:test@127.0.0.1:5432/test_cadria
+      REDIS_URL: redis://127.0.0.1:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "True"
+      AI_PROVIDER: demo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.17"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Ruff
+        run: uv run ruff check .
+
+      - name: Black
+        run: uv run black --check .
+
+      - name: Django system checks
+        run: uv run python manage.py check
+
+      - name: Django deployment checks
+        env:
+          DJANGO_SECRET_KEY: ci-deployment-check-only-9f3a7c1e5b8d2a6f4c0e7b3d9a1f5c8e
+          DJANGO_SECURE_SSL_REDIRECT: "True"
+          SESSION_COOKIE_SECURE: "True"
+          CSRF_COOKIE_SECURE: "True"
+          SECURE_HSTS_SECONDS: "31536000"
+          SECURE_HSTS_INCLUDE_SUBDOMAINS: "True"
+          SECURE_HSTS_PRELOAD: "True"
+        run: uv run python manage.py check --deploy --fail-level WARNING
+
+      - name: Validate migrations
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Collect static files
+        run: uv run python manage.py collectstatic --noinput
+
+      - name: Tests with coverage
+        run: |
+          uv run coverage run manage.py test
+          uv run coverage report

@@ -1,0 +1,95 @@
+<article class="analysis-result" data-result-content aria-labelledby="analysis-title">
+    <header class="analysis-header">
+        <div>
+            <p class="eyebrow"><span></span> Analyse CadrIA</p>
+            <h2 id="analysis-title">Votre brief, mis au clair.</h2>
+        </div>
+        <svg class="analysis-stamp" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="43" />
+            <circle cx="50" cy="50" r="35" />
+            <path d="m50 27 4.5 14L69 46l-14.5 4.5L50 65l-4.5-14.5L31 46l14.5-5z" />
+            <text x="50" y="85" text-anchor="middle">CADRIA</text>
+        </svg>
+    </header>
+
+    <section class="analysis-summary" aria-labelledby="summary-title">
+        <span class="analysis-number">01</span>
+        <div>
+            <p class="mini-label">L’essentiel</p>
+            <h3 id="summary-title">Synthèse</h3>
+            <p>{{ analysis.summary }}</p>
+        </div>
+    </section>
+
+    <div class="analysis-columns">
+        <section class="analysis-section" aria-labelledby="objectives-title">
+            <div class="analysis-section-heading">
+                <span class="analysis-number">02</span>
+                <div><p class="mini-label">La direction</p><h3 id="objectives-title">Objectifs</h3></div>
+            </div>
+            {% if analysis.objectives %}
+                <ul class="analysis-list analysis-list--check">
+                    {% for objective in analysis.objectives %}
+                        <li><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span><p>{{ objective }}</p></li>
+                    {% endfor %}
+                </ul>
+            {% else %}<p class="analysis-empty">Aucun objectif n’a pu être extrait.</p>{% endif %}
+        </section>
+
+        <section class="analysis-section" aria-labelledby="deliverables-title">
+            <div class="analysis-section-heading">
+                <span class="analysis-number">03</span>
+                <div><p class="mini-label">Le concret</p><h3 id="deliverables-title">Livrables</h3></div>
+            </div>
+            {% if analysis.deliverables %}
+                <ul class="analysis-list analysis-list--document">
+                    {% for deliverable in analysis.deliverables %}
+                        <li><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM15 3v5h4"/></svg></span><p>{{ deliverable }}</p></li>
+                    {% endfor %}
+                </ul>
+            {% else %}<p class="analysis-empty">Aucun livrable n’a pu être extrait.</p>{% endif %}
+        </section>
+    </div>
+
+    <div class="analysis-columns analysis-columns--lower">
+        <section class="analysis-section analysis-section--risks" aria-labelledby="risks-title">
+            <div class="analysis-section-heading">
+                <span class="analysis-number">04</span>
+                <div><p class="mini-label">Les points de vigilance</p><h3 id="risks-title">Risques à anticiper</h3></div>
+            </div>
+            {% if analysis.risks %}
+                <ul class="analysis-list analysis-list--risk">
+                    {% for risk in analysis.risks %}
+                        <li><span aria-hidden="true">!</span><p>{{ risk }}</p></li>
+                    {% endfor %}
+                </ul>
+            {% else %}<p class="analysis-empty">Aucun risque majeur n’a été identifié.</p>{% endif %}
+        </section>
+
+        <section class="analysis-section analysis-section--actions" aria-labelledby="steps-title">
+            <div class="analysis-section-heading">
+                <span class="analysis-number">05</span>
+                <div><p class="mini-label">Dès maintenant</p><h3 id="steps-title">Prochaines étapes</h3></div>
+            </div>
+            {% if analysis.next_steps %}
+                <ol class="action-list">
+                    {% for step in analysis.next_steps %}
+                        <li><span>{{ forloop.counter|stringformat:"02d" }}</span><p>{{ step }}</p></li>
+                    {% endfor %}
+                </ol>
+            {% else %}<p class="analysis-empty">Aucune prochaine étape n’a pu être extraite.</p>{% endif %}
+        </section>
+    </div>
+
+    <footer class="analysis-meta">
+        <div>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/></svg>
+            <span>Généré par <strong>{{ brief.provider|default:"votre fournisseur IA" }}</strong>{% if brief.model %} · {{ brief.model }}{% endif %}</span>
+        </div>
+        <div>
+            {% if analysis.duration_ms %}<span>{{ analysis.duration_ms }} ms</span>{% endif %}
+            {% if analysis.tokens_used %}<span>{{ analysis.tokens_used }} jetons</span>{% endif %}
+            <time datetime="{{ analysis.created_at|date:'c' }}">{{ analysis.created_at|date:"d/m/Y à H:i" }}</time>
+        </div>
+    </footer>
+</article>

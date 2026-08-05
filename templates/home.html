@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}CadrIA · De l’idée au plan d’action{% endblock %}
+{% block body_class %}home-page{% endblock %}
+{% block content %}
+<section class="hero">
+    <div class="shell hero-grid">
+        <div class="hero-copy">
+            <p class="eyebrow"><span></span> Copilote de cadrage par IA</p>
+            <h1>Une idée floue.<br><em>Un plan qui tient debout.</em></h1>
+            <p class="hero-lead">Déposez votre intuition. CadrIA la questionne, l’organise et la transforme en brief exploitable par votre équipe.</p>
+            <div class="hero-actions">
+                {% if user.is_authenticated %}
+                    <a class="button button--primary button--large" href="{% url 'briefs:create' %}">
+                        Cadrer une idée
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                    </a>
+                    <a class="button button--ghost button--large" href="{% url 'dashboard' %}">Voir mes briefs</a>
+                {% else %}
+                    <a class="button button--primary button--large" href="{% url 'accounts:signup' %}">
+                        Créer mon premier brief
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                    </a>
+                    <a class="button button--ghost button--large" href="{% url 'login' %}">J’ai déjà un compte</a>
+                {% endif %}
+            </div>
+            <ul class="hero-reassurance" aria-label="Avantages">
+                <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> Sans carte bancaire</li>
+                <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.7 8 7 10 4.3-2 7-5.5 7-10V6z"/></svg> Données privées</li>
+            </ul>
+        </div>
+
+        <div class="hero-workbench" aria-label="Aperçu d’un brief généré">
+            <div class="workbench-note workbench-note--input">
+                <div class="note-topline"><span>Votre idée</span><span class="note-dots" aria-hidden="true">•••</span></div>
+                <p>« Une newsletter qui aide les indépendants à mieux fixer leurs prix. »</p>
+            </div>
+            <svg class="workbench-path" viewBox="0 0 160 110" aria-hidden="true">
+                <path d="M15 7c10 55 105 12 130 87" />
+                <path d="m137 84 8 10 3-13" />
+            </svg>
+            <div class="ai-seal" aria-hidden="true">
+                <svg viewBox="0 0 44 44"><path d="m22 5 3.4 10.5L36 19l-10.6 3.4L22 33l-3.4-10.6L8 19l10.6-3.5z" /></svg>
+                <span>IA</span>
+            </div>
+            <article class="workbench-result">
+                <header>
+                    <div>
+                        <span class="mini-label">Brief stratégique</span>
+                        <h2>Juste Prix</h2>
+                    </div>
+                    <span class="status-pill status-pill--completed"><i></i> Prêt</span>
+                </header>
+                <div class="result-preview-section">
+                    <span>01 · Objectif</span>
+                    <p>Donner une méthode concrète pour construire un tarif rentable et assumé.</p>
+                </div>
+                <div class="result-preview-grid">
+                    <div><span>Audience</span><strong>Freelances<br>0–3 ans</strong></div>
+                    <div><span>Format</span><strong>5 min<br>chaque jeudi</strong></div>
+                </div>
+                <div class="result-preview-section result-preview-section--last">
+                    <span>03 · Prochain pas</span>
+                    <p>Interviewer cinq indépendants cette semaine.</p>
+                </div>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="proof-strip" aria-label="Les engagements CadrIA">
+    <div class="shell proof-grid">
+        <p><strong>30 secondes</strong><span>pour passer de l’intuition au cadre</span></p>
+        <p><strong>7 angles</strong><span>analysés dans chaque brief</span></p>
+        <p><strong>1 historique</strong><span>pour retrouver toutes vos réflexions</span></p>
+    </div>
+</section>
+
+<section class="section process-section" aria-labelledby="process-title">
+    <div class="shell">
+        <div class="section-heading">
+            <p class="eyebrow"><span></span> Simple, pas simpliste</p>
+            <h2 id="process-title">Votre intuition mérite<br>mieux qu’une page blanche.</h2>
+            <p>CadrIA vous fait avancer sans vous enfermer. Trois temps, un livrable directement partageable.</p>
+        </div>
+        <ol class="process-grid">
+            <li class="process-card">
+                <span class="process-number">01</span>
+                <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 8h24v32H12zM18 17h12M18 24h12M18 31h7"/></svg>
+                <h3>Posez l’idée</h3>
+                <p>Quelques phrases suffisent. Ajoutez votre audience et vos contraintes si vous les connaissez.</p>
+            </li>
+            <li class="process-card process-card--accent">
+                <span class="process-number">02</span>
+                <svg viewBox="0 0 48 48" aria-hidden="true"><path d="m24 6 3.5 11.5L39 21l-11.5 3.5L24 36l-3.5-11.5L9 21l11.5-3.5zM38 34l1.5 4.5L44 40l-4.5 1.5L38 46l-1.5-4.5L32 40l4.5-1.5z"/></svg>
+                <h3>Laissez l’IA cadrer</h3>
+                <p>Le copilote dégage l’objectif, le périmètre, les risques et un plan d’action cohérent.</p>
+            </li>
+            <li class="process-card">
+                <span class="process-number">03</span>
+                <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 11h30v27H9zM15 18h18M15 25h11M15 32h15"/><path d="m31 7 3 3 6-6"/></svg>
+                <h3>Passez à l’action</h3>
+                <p>Relisez un brief hiérarchisé, partagez-le et commencez par la première étape.</p>
+            </li>
+        </ol>
+    </div>
+</section>
+
+<section class="section sample-section" aria-labelledby="sample-title">
+    <div class="shell sample-grid">
+        <div class="sample-copy">
+            <p class="eyebrow eyebrow--light"><span></span> Une structure qui répond</p>
+            <h2 id="sample-title">Pas une tartine de texte.<br>Un outil de décision.</h2>
+            <p>Chaque analyse est découpée pour être lue, discutée puis utilisée. Les zones de flou restent visibles : une bonne IA ne prétend pas tout savoir.</p>
+            <ul class="feature-list">
+                <li><span>01</span> Synthèse et proposition de valeur</li>
+                <li><span>02</span> Audience, objectifs et livrables</li>
+                <li><span>03</span> Plan d’action priorisé</li>
+                <li><span>04</span> Risques, indicateurs et questions ouvertes</li>
+            </ul>
+        </div>
+        <div class="sample-sheet" aria-hidden="true">
+            <div class="sample-sheet-header"><span>CadrIA / Analyse</span><span>24.07</span></div>
+            <h3>L’essentiel en une phrase</h3>
+            <p>Une newsletter courte et concrète qui redonne aux indépendants le contrôle de leur rentabilité.</p>
+            <div class="sample-lines"><i></i><i></i><i></i></div>
+            <div class="sample-stamp">Actionnable</div>
+        </div>
+    </div>
+</section>
+
+<section class="section final-cta">
+    <div class="shell final-cta-inner">
+        <div>
+            <p class="eyebrow"><span></span> Votre prochain projet commence ici</p>
+            <h2>Qu’avez-vous en tête&nbsp;?</h2>
+        </div>
+        <a class="button button--ink button--large" href="{% if user.is_authenticated %}{% url 'briefs:create' %}{% else %}{% url 'accounts:signup' %}{% endif %}">
+            Donner un cadre à mon idée
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+    </div>
+</section>
+{% endblock %}

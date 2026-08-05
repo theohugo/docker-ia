@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Accès refusé · CadrIA{% endblock %}
+{% block body_class %}error-page{% endblock %}
+{% block content %}
+<section class="error-screen shell">
+    <div class="error-code" aria-hidden="true">403</div>
+    <p class="eyebrow"><span></span> Porte fermée</p>
+    <h1>Ce brief appartient<br>à un autre espace.</h1>
+    <p>Vous n’avez pas l’autorisation d’accéder à cette page. Vérifiez le compte utilisé ou revenez à vos briefs.</p>
+    <a class="button button--primary button--large" href="{% url 'dashboard' %}">Retour à mes briefs</a>
+</section>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Page introuvable · CadrIA{% endblock %}
+{% block body_class %}error-page{% endblock %}
+{% block content %}
+<section class="error-screen shell">
+    <div class="error-code" aria-hidden="true">404</div>
+    <p class="eyebrow"><span></span> Hors cadre</p>
+    <h1>Cette page manque<br>au plan.</h1>
+    <p>Le lien est peut-être ancien, incomplet ou la page a été déplacée. Repartons d’un endroit connu.</p>
+    <a class="button button--primary button--large" href="{% url 'home' %}">Revenir à l’accueil</a>
+</section>
+{% endblock %}

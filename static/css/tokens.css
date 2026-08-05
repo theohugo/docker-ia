@@ -1,0 +1,133 @@
+:root {
+    color-scheme: light;
+
+    /* Palette de marque — référentiel CadrIA */
+    --color-primary: #7c3aed;
+    --color-primary-strong: #6826d7;
+    --color-primary-soft: #ede9fe;
+    --color-on-primary: #ffffff;
+    --color-secondary: #6366f1;
+    --color-accent: #ec4899;
+    --color-accent-strong: #d93483;
+    --color-accent-soft: #fce7f3;
+    --color-background: #faf5ff;
+    --color-foreground: #0f172a;
+    --color-muted: #f7f3fd;
+    --color-border: #e8def8;
+    --color-control-border: #767085;
+    --color-destructive: #dc2626;
+    --color-ring: #7c3aed;
+
+    /* Surfaces sémantiques */
+    --color-surface: #fffefe;
+    --color-surface-raised: #ffffff;
+    --color-surface-soft: #f6f0fc;
+    --color-surface-inverse: #17122b;
+    --color-text: #0f172a;
+    --color-text-soft: #3f4759;
+    --color-text-muted: #667085;
+    --color-text-on-dark: #f9f7ff;
+    --color-line: #dfd4f2;
+    --color-success: #15803d;
+    --color-success-soft: #dcfce7;
+    --color-warning: #854d0e;
+    --color-warning-soft: #fef3c7;
+    --color-error: #b91c1c;
+    --color-error-soft: #fee2e2;
+    --color-info: #4338ca;
+    --color-info-soft: #e0e7ff;
+    --color-selection: #e9d5ff;
+    --color-feature-start: #5b21b6;
+    --color-feature-end: #3730a3;
+    --color-on-feature: #ffffff;
+    --color-on-feature-muted: #ede9fe;
+
+    /* Typographie — Inter est chargée dans le document, avec repli système */
+    --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-display: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+    --text-2xl: clamp(1.5rem, 3vw, 2rem);
+    --text-3xl: clamp(2rem, 4vw, 3rem);
+    --text-hero: clamp(2.7rem, 6vw, 5.4rem);
+
+    /* Espacement — densité standard */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+    --space-3xl: 4rem;
+    --space-4xl: 6rem;
+
+    /* Formes et profondeur Soft UI Evolution */
+    --radius-xs: 0.375rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.5rem;
+    --radius-pill: 999px;
+    --shadow-xs: 0 1px 2px rgba(43, 24, 73, 0.06);
+    --shadow-sm: 0 2px 8px rgba(43, 24, 73, 0.07), 0 1px 2px rgba(43, 24, 73, 0.04);
+    --shadow-md: 0 8px 24px rgba(43, 24, 73, 0.09), 0 2px 7px rgba(43, 24, 73, 0.05);
+    --shadow-lg: 0 18px 48px rgba(43, 24, 73, 0.12), 0 5px 14px rgba(43, 24, 73, 0.06);
+    --shadow-xl: 0 28px 70px rgba(30, 16, 53, 0.18), 0 8px 22px rgba(43, 24, 73, 0.08);
+    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+
+    --shell: 74rem;
+    --header-height: 4.75rem;
+    --transition-fast: 160ms ease;
+    --transition-base: 220ms ease;
+    --transition-slow: 300ms ease;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-primary: #a78bfa;
+    --color-primary-strong: #c4b5fd;
+    --color-primary-soft: #2e2451;
+    --color-on-primary: #170d2b;
+    --color-secondary: #818cf8;
+    --color-accent: #f472b6;
+    --color-accent-strong: #fb9acc;
+    --color-accent-soft: #4a1937;
+    --color-background: #100d18;
+    --color-foreground: #f8f7fc;
+    --color-muted: #191522;
+    --color-border: #342b43;
+    --color-control-border: #82778f;
+    --color-ring: #c4b5fd;
+    --color-surface: #17131f;
+    --color-surface-raised: #1d1827;
+    --color-surface-soft: #211a2c;
+    --color-surface-inverse: #f5f0ff;
+    --color-text: #f8f7fc;
+    --color-text-soft: #d8d2e2;
+    --color-text-muted: #a9a0b6;
+    --color-text-on-dark: #191126;
+    --color-line: #3a304a;
+    --color-success: #86efac;
+    --color-success-soft: #173723;
+    --color-warning: #fde68a;
+    --color-warning-soft: #3e3114;
+    --color-error: #fca5a5;
+    --color-error-soft: #441d25;
+    --color-info: #a5b4fc;
+    --color-info-soft: #23264b;
+    --color-selection: #4c3271;
+    --color-feature-start: #4c1d95;
+    --color-feature-end: #312e81;
+    --color-on-feature: #ffffff;
+    --color-on-feature-muted: #ede9fe;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+    --shadow-sm: 0 3px 10px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 10px 26px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 20px 52px rgba(0, 0, 0, 0.32);
+    --shadow-xl: 0 30px 76px rgba(0, 0, 0, 0.42);
+    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
