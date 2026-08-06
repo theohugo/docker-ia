@@ -6,6 +6,7 @@ app_name = "briefs"
 
 urlpatterns = [
     path("new/", views.create, name="create"),
-    path("<uuid:pk>/", views.detail, name="detail"),
+    path("<uuid:pk>/pdf/", views.download_pdf, name="download_pdf"),
     path("<uuid:pk>/status/", views.status, name="status"),
+    path("<uuid:pk>/", views.detail, name="detail"),
 ]

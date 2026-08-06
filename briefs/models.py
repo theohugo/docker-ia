@@ -40,14 +40,22 @@ class ProjectBrief(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["user", "status", "-created_at"], name="brief_user_status_idx")]
+        indexes = [
+            models.Index(
+                fields=["user", "status", "-created_at"],
+                name="brief_user_status_idx",
+            )
+        ]
 
     def __str__(self) -> str:
         return self.title
 
     @property
     def is_terminal(self) -> bool:
-        return self.status in {self.Status.COMPLETED, self.Status.FAILED}
+        return self.status in {
+            self.Status.COMPLETED,
+            self.Status.FAILED,
+        }
 
 
 class AnalysisResult(models.Model):
@@ -64,6 +72,16 @@ class AnalysisResult(models.Model):
     raw_response = models.JSONField(default=dict)
     tokens_used = models.PositiveIntegerField(default=0)
     duration_ms = models.PositiveIntegerField(default=0)
+
+    pdf_file = models.FileField(
+        upload_to="brief_exports/%Y/%m/",
+        blank=True,
+    )
+    pdf_generated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -88,7 +106,10 @@ class GenerationEvent(models.Model):
         on_delete=models.CASCADE,
         related_name="generation_events",
     )
-    event_type = models.CharField(max_length=16, choices=Type.choices)
+    event_type = models.CharField(
+        max_length=16,
+        choices=Type.choices,
+    )
     provider = models.CharField(max_length=40, blank=True)
     model = models.CharField(max_length=120, blank=True)
     message = models.CharField(max_length=255, blank=True)
@@ -97,7 +118,12 @@ class GenerationEvent(models.Model):
 
     class Meta:
         ordering = ["created_at", "pk"]
-        indexes = [models.Index(fields=["brief", "created_at"], name="event_brief_date_idx")]
+        indexes = [
+            models.Index(
+                fields=["brief", "created_at"],
+                name="event_brief_date_idx",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.get_event_type_display()} — {self.brief.title}"

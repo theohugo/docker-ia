@@ -42,6 +42,29 @@ et reprend les bonnes conventions d'architecture, de Docker et d'outillage du d�
 > éliminatoire « intégration IA fonctionnelle ». Il reste à reproduire une configuration IA réelle sur l'URL publique
 > une fois déployée, puis à remplacer le marqueur « À COMPLÉTER » placé en tête de ce README.
 
+## Export PDF sécurisé
+
+Les analyses terminées peuvent être téléchargées sous la forme d'un document PDF structuré depuis leur page de détail.
+
+Le fonctionnement respecte les règles suivantes :
+
+- le bouton de téléchargement est affiché uniquement lorsqu'une analyse est terminée ;
+- l'utilisateur doit être authentifié ;
+- un utilisateur peut uniquement télécharger les PDF associés à ses propres briefs ;
+- une tentative d'accès au brief d'un autre utilisateur renvoie une réponse 404 ;
+- le PDF est généré lors du premier téléchargement puis conservé pour les téléchargements suivants ;
+- un fichier absent du stockage est automatiquement régénéré ;
+- les documents sont enregistrés dans `MEDIA_ROOT/brief_exports/YYYY/MM/` ;
+- le fichier est transmis par une vue Django protégée avec `FileResponse`, et non par une URL publique directe.
+
+Le PDF contient le contexte initial, la synthèse, les objectifs, les livrables, les risques, les prochaines étapes ainsi que les informations techniques de génération.
+
+Les tests dédiés peuvent être lancés avec :
+
+```bash
+docker compose exec web python manage.py test briefs.tests.test_pdf_export -v 2
+```
+
 ## Démarrage rapide avec Docker
 
 Prérequis : Docker Engine avec le plugin Compose.
