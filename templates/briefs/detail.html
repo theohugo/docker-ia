@@ -1,82 +1,224 @@
 {% extends "base.html" %}
+
 {% block title %}{{ brief.title }} · CadrIA{% endblock %}
 {% block body_class %}workspace-page detail-page{% endblock %}
+
 {% block content %}
 <div class="shell detail-shell">
     <nav class="breadcrumb" aria-label="Fil d’Ariane">
         <a href="{% url 'dashboard' %}">Mes briefs</a>
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 15 5-5-5-5"/></svg>
-        <span aria-current="page">{{ brief.title|truncatechars:42 }}</span>
+
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m8 15 5-5-5-5"/>
+        </svg>
+
+        <span aria-current="page">
+            {{ brief.title|truncatechars:42 }}
+        </span>
     </nav>
 
     <header class="detail-heading">
         <div>
             <div class="detail-topline">
-                <span class="status-pill status-pill--{{ brief.status }}" data-status-pill>
+                <span
+                    class="status-pill status-pill--{{ brief.status }}"
+                    data-status-pill
+                >
                     <i></i>
+
                     <span data-status-label>
-                        {% if brief.status == "completed" %}Analyse prête
-                        {% elif brief.status == "processing" %}Analyse en cours
-                        {% elif brief.status == "queued" or brief.status == "pending" %}Dans la file d’attente
-                        {% elif brief.status == "failed" %}Analyse interrompue
-                        {% else %}Brouillon{% endif %}
+                        {% if brief.status == "completed" %}
+                            Analyse prête
+                        {% elif brief.status == "processing" %}
+                            Analyse en cours
+                        {% elif brief.status == "queued" or brief.status == "pending" %}
+                            Dans la file d’attente
+                        {% elif brief.status == "failed" %}
+                            Analyse interrompue
+                        {% else %}
+                            Brouillon
+                        {% endif %}
                     </span>
                 </span>
-                <time datetime="{{ brief.created_at|date:'c' }}">Créé le {{ brief.created_at|date:"d F Y à H:i" }}</time>
+
+                <time datetime="{{ brief.created_at|date:'c' }}">
+                    Créé le {{ brief.created_at|date:"d F Y à H:i" }}
+                </time>
             </div>
+
             <h1>{{ brief.title }}</h1>
             <p>{{ brief.raw_idea }}</p>
         </div>
-        {% if brief.status == "completed" %}
-            <button class="button button--ghost" type="button" data-copy-result>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8h10v12H9z"/><path d="M15 8V4H5v12h4"/></svg>
-                <span>Copier le brief</span>
-            </button>
-            <p class="sr-only" aria-live="polite" aria-atomic="true" data-copy-status></p>
+
+        {% if brief.status == "completed" and brief.analysis %}
+            <div class="detail-actions">
+                <a
+                    class="button button--primary"
+                    href="{% url 'briefs:download_pdf' brief.pk %}"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3v12"/>
+                        <path d="m7 10 5 5 5-5"/>
+                        <path d="M5 19h14"/>
+                    </svg>
+
+                    <span>Télécharger en PDF</span>
+                </a>
+
+                <button
+                    class="button button--ghost"
+                    type="button"
+                    data-copy-result
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 8h10v12H9z"/>
+                        <path d="M15 8V4H5v12h4"/>
+                    </svg>
+
+                    <span>Copier le brief</span>
+                </button>
+
+                <p
+                    class="sr-only"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    data-copy-status
+                ></p>
+            </div>
         {% endif %}
     </header>
 
     <section class="source-context" aria-label="Contexte fourni">
         <details>
             <summary>
-                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6"/></svg> Revoir le contexte transmis</span>
-                <svg class="details-caret" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
+                <span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 4h14v16H5zM9 9h6M9 13h6"/>
+                    </svg>
+
+                    Revoir le contexte transmis
+                </span>
+
+                <svg
+                    class="details-caret"
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
+                >
+                    <path d="m5 8 5 5 5-5"/>
+                </svg>
             </summary>
+
             <dl>
-                <div><dt>Idée brute</dt><dd>{{ brief.raw_idea }}</dd></div>
-                <div><dt>Audience</dt><dd>{{ brief.audience|default:"Non précisée" }}</dd></div>
-                <div><dt>Contraintes</dt><dd>{{ brief.constraints|default:"Aucune contrainte précisée" }}</dd></div>
+                <div>
+                    <dt>Idée brute</dt>
+                    <dd>{{ brief.raw_idea }}</dd>
+                </div>
+
+                <div>
+                    <dt>Audience</dt>
+                    <dd>{{ brief.audience|default:"Non précisée" }}</dd>
+                </div>
+
+                <div>
+                    <dt>Contraintes</dt>
+                    <dd>
+                        {{ brief.constraints|default:"Aucune contrainte précisée" }}
+                    </dd>
+                </div>
             </dl>
         </details>
     </section>
 
     {% if brief.status == "completed" and brief.analysis %}
         {% include "briefs/partials/result.html" with analysis=brief.analysis %}
+
     {% elif brief.status == "failed" %}
-        <section class="generation-error" role="alert" aria-labelledby="error-title">
-            <div class="error-symbol" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 5 44 40H4z"/><path d="M24 17v10m0 6h.01"/></svg></div>
+        <section
+            class="generation-error"
+            role="alert"
+            aria-labelledby="error-title"
+        >
+            <div class="error-symbol" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                    <path d="M24 5 44 40H4z"/>
+                    <path d="M24 17v10m0 6h.01"/>
+                </svg>
+            </div>
+
             <div>
-                <p class="eyebrow"><span></span> L’analyse s’est arrêtée</p>
+                <p class="eyebrow">
+                    <span></span>
+                    L’analyse s’est arrêtée
+                </p>
+
                 {% if brief.error_code == "provider_quota" or brief.error_code == "quota" or brief.error_code == "quota_exceeded" or brief.error_code == "rate_limit" %}
-                    <h2 id="error-title">Le quota du fournisseur IA est atteint.</h2>
-                    <p>Votre idée est bien enregistrée. Le service a reçu trop de demandes ou sa limite temporaire est atteinte. Réessayez dans quelques minutes.</p>
+                    <h2 id="error-title">
+                        Le quota du fournisseur IA est atteint.
+                    </h2>
+
+                    <p>
+                        Votre idée est bien enregistrée. Le service a reçu trop
+                        de demandes ou sa limite temporaire est atteinte.
+                        Réessayez dans quelques minutes.
+                    </p>
+
                 {% elif brief.error_code == "provider_authentication" or brief.error_code == "authentication" or brief.error_code == "auth" or brief.error_code == "invalid_api_key" or brief.error_code == "configuration_error" %}
-                    <h2 id="error-title">Le fournisseur IA n’a pas pu s’authentifier.</h2>
-                    <p>La configuration du service doit être vérifiée par l’équipe. Votre brief reste sauvegardé et aucune donnée n’est perdue.</p>
+                    <h2 id="error-title">
+                        Le fournisseur IA n’a pas pu s’authentifier.
+                    </h2>
+
+                    <p>
+                        La configuration du service doit être vérifiée par
+                        l’équipe. Votre brief reste sauvegardé et aucune donnée
+                        n’est perdue.
+                    </p>
+
                 {% elif brief.error_code == "provider" or brief.error_code == "provider_unavailable" or brief.error_code == "queue_unavailable" or brief.error_code == "timeout" %}
-                    <h2 id="error-title">Le fournisseur IA est momentanément indisponible.</h2>
-                    <p>Le service met trop de temps à répondre. Votre brief est conservé&nbsp;; vous pourrez relancer l’analyse un peu plus tard.</p>
+                    <h2 id="error-title">
+                        Le fournisseur IA est momentanément indisponible.
+                    </h2>
+
+                    <p>
+                        Le service met trop de temps à répondre. Votre brief est
+                        conservé&nbsp;; vous pourrez relancer l’analyse un peu
+                        plus tard.
+                    </p>
+
                 {% else %}
-                    <h2 id="error-title">Nous n’avons pas pu terminer ce brief.</h2>
-                    <p>{{ brief.error_message|default:"Une erreur inattendue a interrompu l’analyse. Votre idée reste enregistrée dans votre espace." }}</p>
+                    <h2 id="error-title">
+                        Nous n’avons pas pu terminer ce brief.
+                    </h2>
+
+                    <p>
+                        {{ brief.error_message|default:"Une erreur inattendue a interrompu l’analyse. Votre idée reste enregistrée dans votre espace." }}
+                    </p>
                 {% endif %}
-                {% if brief.error_code %}<p class="error-reference">Référence&nbsp;: <code>{{ brief.error_code }}</code></p>{% endif %}
+
+                {% if brief.error_code %}
+                    <p class="error-reference">
+                        Référence&nbsp;:
+                        <code>{{ brief.error_code }}</code>
+                    </p>
+                {% endif %}
+
                 <div class="error-actions">
-                    <a class="button button--primary" href="{% url 'briefs:create' %}">Créer un nouveau brief</a>
-                    <a class="button button--ghost" href="{% url 'dashboard' %}">Retour à mes briefs</a>
+                    <a
+                        class="button button--primary"
+                        href="{% url 'briefs:create' %}"
+                    >
+                        Créer un nouveau brief
+                    </a>
+
+                    <a
+                        class="button button--ghost"
+                        href="{% url 'dashboard' %}"
+                    >
+                        Retour à mes briefs
+                    </a>
                 </div>
             </div>
         </section>
+
     {% else %}
         <section
             class="generation-state"
@@ -88,47 +230,146 @@
         >
             <div class="generation-intro">
                 <div class="ai-orb" aria-hidden="true">
-                    <svg viewBox="0 0 64 64"><path d="m32 8 5.2 18.8L56 32l-18.8 5.2L32 56l-5.2-18.8L8 32l18.8-5.2z"/></svg>
-                    <i></i><i></i><i></i>
+                    <svg viewBox="0 0 64 64">
+                        <path d="m32 8 5.2 18.8L56 32l-18.8 5.2L32 56l-5.2-18.8L8 32l18.8-5.2z"/>
+                    </svg>
+
+                    <i></i>
+                    <i></i>
+                    <i></i>
                 </div>
-                <p class="eyebrow"><span></span> Cadrage en cours</p>
+
+                <p class="eyebrow">
+                    <span></span>
+                    Cadrage en cours
+                </p>
+
                 <h2 id="generation-title" data-progress-title>
-                    {% if brief.status == "processing" %}L’IA construit votre plan…{% else %}Votre idée prend place dans la file…{% endif %}
+                    {% if brief.status == "processing" %}
+                        L’IA construit votre plan…
+                    {% else %}
+                        Votre idée prend place dans la file…
+                    {% endif %}
                 </h2>
-                <p data-progress-message>Vous pouvez garder cette page ouverte. Le brief s’affichera automatiquement dès qu’il sera prêt.</p>
-                <p class="sr-only" aria-live="polite" aria-atomic="true" data-poll-announcer></p>
+
+                <p data-progress-message>
+                    Vous pouvez garder cette page ouverte. Le brief s’affichera
+                    automatiquement dès qu’il sera prêt.
+                </p>
+
+                <p
+                    class="sr-only"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    data-poll-announcer
+                ></p>
             </div>
 
-            <ol class="generation-steps" aria-label="Progression de l’analyse">
+            <ol
+                class="generation-steps"
+                aria-label="Progression de l’analyse"
+            >
                 <li class="is-active" data-progress-step="queued">
-                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></span>
-                    <div><strong>Préparation</strong><small>Votre demande est prise en charge</small></div>
+                    <span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                        </svg>
+                    </span>
+
+                    <div>
+                        <strong>Préparation</strong>
+                        <small>Votre demande est prise en charge</small>
+                    </div>
                 </li>
+
                 <li data-progress-step="processing">
-                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/></svg></span>
-                    <div><strong>Analyse</strong><small>Objectifs, risques et livrables</small></div>
+                    <span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m12 3 2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/>
+                        </svg>
+                    </span>
+
+                    <div>
+                        <strong>Analyse</strong>
+                        <small>Objectifs, risques et livrables</small>
+                    </div>
                 </li>
+
                 <li data-progress-step="completed">
-                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></span>
-                    <div><strong>Restitution</strong><small>Mise en forme de votre plan</small></div>
+                    <span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m5 12 4 4L19 6"/>
+                        </svg>
+                    </span>
+
+                    <div>
+                        <strong>Restitution</strong>
+                        <small>Mise en forme de votre plan</small>
+                    </div>
                 </li>
             </ol>
 
             <div class="analysis-skeleton" aria-hidden="true">
-                <div class="skeleton-head"><i></i><i></i></div>
+                <div class="skeleton-head">
+                    <i></i>
+                    <i></i>
+                </div>
+
                 <div class="skeleton-line skeleton-line--full"></div>
                 <div class="skeleton-line skeleton-line--wide"></div>
                 <div class="skeleton-line skeleton-line--medium"></div>
-                <div class="skeleton-grid"><i></i><i></i><i></i></div>
+
+                <div class="skeleton-grid">
+                    <i></i>
+                    <i></i>
+                    <i></i>
+                </div>
             </div>
 
-            <div class="poll-error" data-poll-error hidden role="alert">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                <div><strong data-poll-error-title>Connexion interrompue</strong><p data-poll-error-message>Nous retentons automatiquement.</p></div>
-                <button class="button button--ghost button--small" type="button" data-poll-retry>Réessayer</button>
-                <a class="button button--ghost button--small" href="{% url 'login' %}?next={{ request.path|urlencode }}" data-poll-login hidden>Se reconnecter</a>
+            <div
+                class="poll-error"
+                data-poll-error
+                hidden
+                role="alert"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                </svg>
+
+                <div>
+                    <strong data-poll-error-title>
+                        Connexion interrompue
+                    </strong>
+
+                    <p data-poll-error-message>
+                        Nous retentons automatiquement.
+                    </p>
+                </div>
+
+                <button
+                    class="button button--ghost button--small"
+                    type="button"
+                    data-poll-retry
+                >
+                    Réessayer
+                </button>
+
+                <a
+                    class="button button--ghost button--small"
+                    href="{% url 'login' %}?next={{ request.path|urlencode }}"
+                    data-poll-login
+                    hidden
+                >
+                    Se reconnecter
+                </a>
             </div>
-            <noscript><p class="noscript-note">JavaScript est désactivé. Rechargez cette page dans quelques instants pour voir le résultat.</p></noscript>
+
+            <noscript>
+                <p class="noscript-note">
+                    JavaScript est désactivé. Rechargez cette page dans quelques
+                    instants pour voir le résultat.
+                </p>
+            </noscript>
         </section>
     {% endif %}
 </div>

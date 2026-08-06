@@ -3228,3 +3228,28 @@ svg {
         box-shadow: none;
     }
 }
+
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.detail-actions .button {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .detail-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .detail-actions .button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
