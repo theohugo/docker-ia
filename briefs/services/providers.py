@@ -310,16 +310,21 @@ def _strip_json_fence(value: str) -> str:
 
 
 def get_provider(provider_name: str | None = None, model: str | None = None) -> AIProvider:
+    """Build the named provider (or the configured primary one when omitted).
+
+    Each provider resolves its own default model (``OLLAMA_MODEL``, ``GROQ_MODEL``, ...)
+    instead of the generic ``AI_MODEL`` so that requesting a provider other than the
+    primary one — e.g. a fallback — never picks up an unrelated model name.
+    """
     name = (provider_name or settings.AI_PROVIDER).strip().lower()
-    configured_model = model or settings.AI_MODEL
 
     if name == "demo":
-        return DemoProvider(model=configured_model)
+        return DemoProvider(model=model or settings.AI_MODEL)
 
     if name == "ollama":
         return OllamaProvider(
             base_url=settings.OLLAMA_BASE_URL,
-            model=configured_model,
+            model=model or settings.OLLAMA_MODEL,
             timeout=settings.OLLAMA_TIMEOUT_SECONDS,
             num_ctx=settings.OLLAMA_NUM_CTX,
             keep_alive=settings.OLLAMA_KEEP_ALIVE,
@@ -328,12 +333,15 @@ def get_provider(provider_name: str | None = None, model: str | None = None) -> 
     if name == "mistral":
         base_url = settings.AI_BASE_URL or "https://api.mistral.ai/v1"
         timeout = settings.AI_TIMEOUT_SECONDS
+        default_model = settings.AI_MODEL
     elif name == "groq":
         base_url = settings.GROQ_BASE_URL or "https://api.groq.com/openai/v1"
         timeout = settings.GROQ_TIMEOUT_SECONDS
+        default_model = settings.GROQ_MODEL
     elif name == "openai_compatible":
         base_url = settings.AI_BASE_URL or "https://api.openai.com/v1"
         timeout = settings.AI_TIMEOUT_SECONDS
+        default_model = settings.AI_MODEL
     else:
         raise AIConfigurationError(f"Unsupported AI_PROVIDER: {name}")
 
@@ -341,6 +349,6 @@ def get_provider(provider_name: str | None = None, model: str | None = None) -> 
         name=name,
         base_url=base_url,
         api_key=settings.AI_API_KEY,
-        model=configured_model,
+        model=model or default_model,
         timeout=timeout,
     )

@@ -137,6 +137,10 @@ AI_TIMEOUT_SECONDS = env("AI_TIMEOUT_SECONDS")
 AI_MAX_INPUT_CHARS = env("AI_MAX_INPUT_CHARS")
 AI_PROMPT_VERSION = env("AI_PROMPT_VERSION", default="v1")
 
+# Secondary provider tried when the primary one fails (any AIServiceError). Empty
+# disables the fallback entirely. Ignored when equal to AI_PROVIDER.
+AI_FALLBACK_PROVIDER = env("AI_FALLBACK_PROVIDER", default="")
+
 # Provider-specific defaults keep switching providers explicit and avoid
 # accidentally sending a local request to a remote base URL (or vice versa).
 GROQ_BASE_URL = env("GROQ_BASE_URL", default="https://api.groq.com/openai/v1")

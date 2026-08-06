@@ -103,8 +103,18 @@ def generate_brief_analysis(self, brief_id: str) -> dict[str, str]:
             event_type=GenerationEvent.Type.COMPLETED,
             provider=output.provider,
             model=output.model,
-            message="Analyse structurée enregistrée.",
-            metadata={"tokens_used": output.tokens_used, "duration_ms": output.duration_ms},
+            message=(
+                "Analyse structurée enregistrée via le fournisseur de secours."
+                if output.fallback_used
+                else "Analyse structurée enregistrée."
+            ),
+            metadata={
+                "tokens_used": output.tokens_used,
+                "duration_ms": output.duration_ms,
+                "fallback_used": output.fallback_used,
+                "primary_provider": output.primary_provider,
+                "primary_error_code": output.primary_error_code,
+            },
         )
 
     logger.info(

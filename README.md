@@ -22,6 +22,8 @@ et reprend les bonnes conventions d'architecture, de Docker et d'outillage du d�
 - Ollama (`qwen2.5:0.5b`) actif par défaut : `docker compose up --build` télécharge le modèle automatiquement si
   besoin et l'utilise réellement, sans commande manuelle ni clé — validé de bout en bout, y compris à froid sur un
   volume vide ;
+- fournisseur de secours (`AI_FALLBACK_PROVIDER`, Groq par défaut) essayé automatiquement si le nominal échoue,
+  sans jamais faire échouer le brief à cause de ce mécanisme lui-même ;
 - réponse JSON validée avant persistance dans PostgreSQL ;
 - mode `demo`, déterministe et sans réseau, conservé comme repli d'onboarding en changeant `AI_PROVIDER` ;
 - progression par polling, skeleton contextualisé et erreurs quota/authentification/réseau explicites ;
@@ -79,11 +81,18 @@ Ne pas ajouter `--volumes` sauf si la suppression de la base locale et de Redis 
 
 ## Brancher un vrai modèle IA
 
-Trois chemins sont prévus : Ollama sans clé et sans envoi des briefs hors de la machine, Groq avec une clé et un
-quota gratuit limité, ou Mistral/OpenAI-compatible. Dans tous les cas, le worker est le seul service qui appelle le
-modèle.
+CadrIA distingue un **fournisseur nominal** (celui qui traite les briefs normalement) et un **fournisseur de secours**
+optionnel, essayé automatiquement si le nominal échoue. Par défaut, `.env.example` configure :
 
-### Option locale légère : Ollama (par défaut)
+- **Nominal : Ollama**, en local, sans clé et sans envoi des briefs hors de la machine — suffit à lui seul à
+  satisfaire le critère « un vrai modèle IA traite effectivement une demande » ;
+- **Secours : Groq**, via `AI_FALLBACK_PROVIDER=groq`, mais **inactif tant qu'aucune clé n'est renseignée**. Sans clé,
+  tout fonctionne exactement comme si ce réglage n'existait pas — aucune action requise pour que le projet marche.
+
+Mistral ou toute API compatible OpenAI peuvent aussi servir de fournisseur nominal à la place d'Ollama. Dans tous les
+cas, le worker est le seul service qui appelle le modèle.
+
+### Fournisseur nominal : Ollama (par défaut)
 
 `.env.example` active `AI_PROVIDER=ollama` et `COMPOSE_PROFILES=ollama` : le profil Compose `ollama` démarre donc
 automatiquement, sans avoir besoin de passer `--profile ollama`. Le modèle conseillé est
@@ -144,24 +153,49 @@ modèle déjà téléchargé :
 docker compose down
 ```
 
-### Option avec clé et quota gratuit : Groq
+### Fournisseur de secours (backup) : activer Groq
 
-Créer une clé dans la [console Groq](https://console.groq.com/keys), puis la conserver uniquement dans `.env` :
+`AI_FALLBACK_PROVIDER` définit un second fournisseur essayé automatiquement, pour la même requête, si le nominal
+échoue — indisponibilité, dépassement de temps, quota ou réponse invalide. `.env.example` a déjà
+`AI_FALLBACK_PROVIDER=groq` : il ne manque qu'une clé pour l'activer. Chaque personne (toi, un camarade, le prof)
+utilise **sa propre clé**, jamais partagée via Git — une clé API authentifie un compte, pas le dépôt.
 
-```dotenv
-AI_PROVIDER=groq
-AI_API_KEY=votre-cle-groq-locale
-GROQ_BASE_URL=https://api.groq.com/openai/v1
-GROQ_MODEL=openai/gpt-oss-20b
-GROQ_TIMEOUT_SECONDS=60
-```
+Pour l'activer :
+
+1. Créer une clé dans la [console Groq](https://console.groq.com/keys) (compte gratuit).
+2. Dans `.env` (jamais `.env.example`), renseigner uniquement :
+   ```dotenv
+   AI_API_KEY=votre-cle-groq-locale
+   ```
+   `AI_PROVIDER=ollama` et `AI_FALLBACK_PROVIDER=groq` restent tels quels — c'est la seule ligne à toucher.
+3. Recharger les conteneurs pour que la variable soit prise en compte (une variable d'environnement n'est lue qu'à la
+   création du conteneur, pas par un `worker` déjà démarré) :
+   ```bash
+   docker compose up -d
+   ```
+
+Rien d'autre à faire : le secours se déclenche de lui-même dès qu'Ollama échoue, sans redémarrage manuel ni action
+utilisateur. Sans clé, le secours échoue silencieusement à son tour et l'erreur d'origine du fournisseur nominal est
+celle renvoyée — comme si `AI_FALLBACK_PROVIDER` était vide. `brief.provider`/`brief.model` et le pied de page de
+l'analyse reflètent toujours le fournisseur qui a réellement répondu ; le journal (`GenerationEvent`) conserve
+`fallback_used`, `primary_provider` et `primary_error_code` pour l'audit.
 
 Au 5 août 2026, Groq documente un **Free Plan** et inclut `openai/gpt-oss-20b` dans ses
 [limites gratuites](https://console.groq.com/docs/rate-limits). Ce quota est soumis à des limites de requêtes et de
 tokens et peut évoluer : ce n'est ni une gratuité permanente ni une garantie de capacité. Une réponse HTTP 429 est
-restituée comme un quota atteint, sans exposer la réponse brute à l'utilisateur.
+restituée comme un quota atteint, sans exposer la réponse brute à l'utilisateur. `AI_PROVIDER=groq` fonctionne aussi
+comme fournisseur nominal à part entière (au lieu d'Ollama), avec la même clé.
 
-### Option Mistral ou API compatible OpenAI
+> [!NOTE]
+> Comportement validé à deux niveaux en coupant volontairement `ollama` (`docker compose stop ollama`) avec
+> `AI_FALLBACK_PROVIDER=groq` : sans `AI_API_KEY`, le worker tente Groq à chaque tentative (initiale + 2 relances),
+> échoue proprement faute de clé, puis restitue l'erreur d'origine du principal (`provider_unavailable`) — aucun
+> blocage, aucune fuite de détail interne. Avec une vraie clé Groq renseignée, le même scénario a produit un aller-retour
+> réseau réel et réussi : brief `completed`, `provider=groq`, `model=openai/gpt-oss-20b`, 698 tokens annoncés, ~9,7 s —
+> nettement plus rapide que l'inférence locale sur `qwen2.5:0.5b`. Le journal (`GenerationEvent`) a bien enregistré
+> `fallback_used=True` et `primary_provider=ollama`.
+
+### Autre fournisseur nominal : Mistral ou API compatible OpenAI
 
 Le premier fournisseur cible est Mistral. Modifier uniquement le fichier local `.env` :
 

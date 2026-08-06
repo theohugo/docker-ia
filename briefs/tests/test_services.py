@@ -1,5 +1,6 @@
 import json
-from unittest.mock import Mock
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import httpx
 from django.test import SimpleTestCase, override_settings
@@ -10,8 +11,15 @@ from briefs.services import (
     AIInvalidResponseError,
     AIProviderUnavailableError,
     AIQuotaError,
+    analyse_brief,
 )
-from briefs.services.providers import DemoProvider, OllamaProvider, OpenAICompatibleProvider, get_provider
+from briefs.services.providers import (
+    DemoProvider,
+    OllamaProvider,
+    OpenAICompatibleProvider,
+    ProviderResponse,
+    get_provider,
+)
 from briefs.services.schema import validate_analysis_payload
 
 
@@ -246,6 +254,7 @@ class ProviderFactoryTests(SimpleTestCase):
         AI_MODEL="openai/gpt-oss-20b",
         AI_API_KEY="test-key",
         GROQ_BASE_URL="https://api.groq.com/openai/v1",
+        GROQ_MODEL="openai/gpt-oss-20b",
         GROQ_TIMEOUT_SECONDS=45,
     )
     def test_groq_uses_the_openai_compatible_adapter(self):
@@ -261,6 +270,7 @@ class ProviderFactoryTests(SimpleTestCase):
         AI_PROVIDER="ollama",
         AI_MODEL="qwen2.5:0.5b",
         OLLAMA_BASE_URL="http://ollama:11434",
+        OLLAMA_MODEL="qwen2.5:0.5b",
         OLLAMA_TIMEOUT_SECONDS=120,
         OLLAMA_NUM_CTX=4096,
         OLLAMA_KEEP_ALIVE="1m",
@@ -277,3 +287,153 @@ class ProviderFactoryTests(SimpleTestCase):
     def test_unknown_provider_is_rejected(self):
         with self.assertRaises(AIConfigurationError):
             get_provider()
+
+    @override_settings(
+        AI_PROVIDER="mistral",
+        AI_MODEL="unrelated-mistral-model",
+        OLLAMA_BASE_URL="http://ollama:11434",
+        OLLAMA_MODEL="qwen2.5:0.5b",
+        OLLAMA_TIMEOUT_SECONDS=120,
+        OLLAMA_NUM_CTX=4096,
+        OLLAMA_KEEP_ALIVE="1m",
+    )
+    def test_requesting_ollama_ignores_the_unrelated_primary_model(self):
+        result = get_provider("ollama")
+
+        self.assertEqual(result.model, "qwen2.5:0.5b")
+
+    @override_settings(
+        AI_PROVIDER="ollama",
+        AI_MODEL="unrelated-ollama-model",
+        AI_API_KEY="test-key",
+        GROQ_BASE_URL="https://api.groq.com/openai/v1",
+        GROQ_MODEL="openai/gpt-oss-20b",
+        GROQ_TIMEOUT_SECONDS=45,
+    )
+    def test_requesting_groq_ignores_the_unrelated_primary_model(self):
+        result = get_provider("groq")
+
+        self.assertEqual(result.model, "openai/gpt-oss-20b")
+
+    @override_settings(
+        AI_PROVIDER="ollama",
+        OLLAMA_BASE_URL="http://ollama:11434",
+        OLLAMA_MODEL="qwen2.5:0.5b",
+        OLLAMA_TIMEOUT_SECONDS=120,
+        OLLAMA_NUM_CTX=4096,
+        OLLAMA_KEEP_ALIVE="1m",
+    )
+    def test_explicit_model_overrides_the_provider_default(self):
+        result = get_provider("ollama", "qwen2.5:1.5b")
+
+        self.assertEqual(result.model, "qwen2.5:1.5b")
+
+
+def brief_stub(**overrides):
+    values = {
+        "title": "Portail partenaire",
+        "raw_idea": "Centraliser toutes les demandes dans un espace unique.",
+        "audience": "Partenaires",
+        "constraints": "Délai de huit semaines",
+        "provider": "ollama",
+        "model": "qwen2.5:0.5b",
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def fake_provider_response():
+    return ProviderResponse(
+        payload=validate_analysis_payload(valid_analysis()),
+        raw_response={"ok": True},
+        tokens_used=42,
+    )
+
+
+class AnalyseBriefFallbackTests(SimpleTestCase):
+    @override_settings(AI_FALLBACK_PROVIDER="groq")
+    def test_fallback_is_used_when_primary_fails(self):
+        primary = Mock()
+        primary.name = "ollama"
+        primary.analyse.side_effect = AIProviderUnavailableError("ConnectError")
+
+        fallback = Mock()
+        fallback.name = "groq"
+        fallback.model = "openai/gpt-oss-20b"
+        fallback.analyse.return_value = fake_provider_response()
+
+        def fake_get_provider(name=None, model=None):
+            return fallback if name == "groq" else primary
+
+        with patch("briefs.services.analysis.get_provider", side_effect=fake_get_provider):
+            output = analyse_brief(brief_stub())
+
+        self.assertTrue(output.fallback_used)
+        self.assertEqual(output.provider, "groq")
+        self.assertEqual(output.model, "openai/gpt-oss-20b")
+        self.assertEqual(output.primary_provider, "ollama")
+        self.assertEqual(output.primary_error_code, "provider_unavailable")
+        fallback.analyse.assert_called_once()
+
+    @override_settings(AI_FALLBACK_PROVIDER="")
+    def test_no_fallback_configured_reraises_primary_error(self):
+        primary = Mock()
+        primary.name = "ollama"
+        primary.analyse.side_effect = AIProviderUnavailableError("ConnectError")
+
+        with (
+            patch("briefs.services.analysis.get_provider", return_value=primary) as get_provider_mock,
+            self.assertRaises(AIProviderUnavailableError),
+        ):
+            analyse_brief(brief_stub())
+
+        get_provider_mock.assert_called_once()
+
+    @override_settings(AI_FALLBACK_PROVIDER="ollama")
+    def test_fallback_equal_to_primary_is_skipped(self):
+        primary = Mock()
+        primary.name = "ollama"
+        primary.analyse.side_effect = AIProviderUnavailableError("ConnectError")
+
+        with (
+            patch("briefs.services.analysis.get_provider", return_value=primary) as get_provider_mock,
+            self.assertRaises(AIProviderUnavailableError),
+        ):
+            analyse_brief(brief_stub())
+
+        get_provider_mock.assert_called_once()
+
+    @override_settings(AI_FALLBACK_PROVIDER="groq")
+    def test_both_primary_and_fallback_failing_raises_primary_error(self):
+        primary = Mock()
+        primary.name = "ollama"
+        primary.analyse.side_effect = AIProviderUnavailableError("ConnectError")
+
+        fallback = Mock()
+        fallback.name = "groq"
+        fallback.analyse.side_effect = AIConfigurationError("AI_API_KEY is missing.")
+
+        def fake_get_provider(name=None, model=None):
+            return fallback if name == "groq" else primary
+
+        with (
+            patch("briefs.services.analysis.get_provider", side_effect=fake_get_provider),
+            self.assertRaises(AIProviderUnavailableError) as captured,
+        ):
+            analyse_brief(brief_stub())
+
+        self.assertEqual(captured.exception.code, "provider_unavailable")
+
+    @override_settings(AI_FALLBACK_PROVIDER="groq")
+    def test_primary_success_does_not_call_fallback(self):
+        primary = Mock()
+        primary.name = "ollama"
+        primary.model = "qwen2.5:0.5b"
+        primary.analyse.return_value = fake_provider_response()
+
+        with patch("briefs.services.analysis.get_provider", return_value=primary) as get_provider_mock:
+            output = analyse_brief(brief_stub())
+
+        self.assertFalse(output.fallback_used)
+        self.assertEqual(output.provider, "ollama")
+        get_provider_mock.assert_called_once()
