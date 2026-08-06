@@ -73,6 +73,14 @@ services:
 
   worker:
     <<: *app
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+        required: false
     environment:
       <<: *django-environment
       RUN_STARTUP_TASKS: "False"
@@ -125,18 +133,26 @@ services:
       OLLAMA_MAX_LOADED_MODELS: "1"
       OLLAMA_NUM_PARALLEL: "1"
       OLLAMA_MAX_QUEUE: "4"
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
     ports:
       - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
     volumes:
       - ollama_data:/root/.ollama
     mem_limit: ${OLLAMA_MEMORY_LIMIT:-2g}
     cpus: ${OLLAMA_CPU_LIMIT:-2.0}
+    entrypoint: ["/bin/sh", "-c"]
+    # Starts the native server, waits for it to accept commands, then pulls the
+    # configured model if it is missing (idempotent: near-instant if already
+    # present). This keeps `docker compose up --build` self-sufficient on a
+    # fresh clone, with no separate manual pull step.
+    command:
+      - 'set -e; ollama serve & server_pid=$!; until ollama list >/dev/null 2>&1; do sleep 1; done; ollama pull "$$OLLAMA_MODEL"; wait "$$server_pid"'
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: ["CMD-SHELL", "ollama list | grep -qF \"$$OLLAMA_MODEL\""]
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 15s
+      retries: 40
+      start_period: 240s
 
 volumes:
   postgres_data:

@@ -2,7 +2,8 @@
 
 > **Membres du groupe : Hugo Raguin · Amine Taleb · Rizlene Berrag**<br>
 > **Production : À COMPLÉTER — https://… (critère éliminatoire)**<br>
-> État : socle initial fonctionnel en local ; déploiement public encore à renseigner.
+> État : `docker compose up --build` démarre un vrai modèle IA (Ollama local, téléchargement automatique) prêt à
+> l'emploi ; déploiement public encore à renseigner.
 
 CadrIA transforme une idée de projet encore floue en un brief actionnable : synthèse, objectifs, livrables, risques et
 prochaines étapes. Chaque analyse est liée au compte qui l'a créée, exécutée hors de la requête HTTP par Celery, puis
@@ -18,8 +19,11 @@ et reprend les bonnes conventions d'architecture, de Docker et d'outillage du d�
 - création et validation serveur d'un brief ;
 - traitement asynchrone Celery via Redis ;
 - fournisseurs Mistral, Groq, OpenAI-compatible et Ollama local isolés derrière une interface ;
+- Ollama (`qwen2.5:0.5b`) actif par défaut : `docker compose up --build` télécharge le modèle automatiquement si
+  besoin et l'utilise réellement, sans commande manuelle ni clé — validé de bout en bout, y compris à froid sur un
+  volume vide ;
 - réponse JSON validée avant persistance dans PostgreSQL ;
-- mode local déterministe `demo`, sans clé ni réseau ;
+- mode `demo`, déterministe et sans réseau, conservé comme repli d'onboarding en changeant `AI_PROVIDER` ;
 - progression par polling, skeleton contextualisé et erreurs quota/authentification/réseau explicites ;
 - thèmes clair/sombre, responsive, navigation clavier et mouvement réduit ;
 - image Docker Python 3.13 slim, non-root, Gunicorn, PostgreSQL, Redis, worker, volumes et healthchecks ;
@@ -27,9 +31,11 @@ et reprend les bonnes conventions d'architecture, de Docker et d'outillage du d�
 - instructions partagées pour Codex (`AGENTS.md`) et Claude Code (`CLAUDE.md`, agents et skills locaux).
 
 > [!IMPORTANT]
-> Le fournisseur `demo` est une simulation utile au développement : il ne satisfait pas le critère éliminatoire
-> « intégration IA fonctionnelle ». Avant la remise, configurer un vrai modèle, le tester sur l'URL publique et remplacer
-> le marqueur « À COMPLÉTER » placé en tête de ce README.
+> `.env.example` a `AI_PROVIDER=ollama` par défaut : un `cp .env.example .env` suivi de `docker compose up --build`
+> suffit à obtenir un vrai modèle IA fonctionnel, sans clé. Le fournisseur `demo` reste disponible (changer
+> `AI_PROVIDER` dans `.env`) pour un onboarding encore plus léger, mais seul ne satisfait pas le critère éliminatoire
+> « intégration IA fonctionnelle ». Il reste à reproduire une configuration IA réelle (Ollama ou un fournisseur à clé)
+> sur l'URL publique une fois déployée, puis à remplacer le marqueur « À COMPLÉTER » placé en tête de ce README.
 
 ## Démarrage rapide avec Docker
 
@@ -41,8 +47,15 @@ docker compose up --build
 ```
 
 L'interface est ensuite disponible sur <http://localhost:8000>. Le service `web` applique les migrations et collecte les
-statiques ; `worker` traite les briefs ; `db` et `cache` conservent respectivement les données et la file de tâches.
+statiques ; `worker` traite les briefs ; `db` et `cache` conservent respectivement les données et la file de tâches ;
+`ollama` sert le vrai modèle IA (voir « Brancher un vrai modèle IA » ci-dessous).
 Si le port 8000 est déjà occupé, modifier `CADRIA_PORT` dans `.env` avant le démarrage.
+
+> [!NOTE]
+> Au tout premier lancement, `docker compose up --build` télécharge l'image Ollama et le modèle `qwen2.5:0.5b`
+> (environ 3,5 Go au total) : compter quelques minutes selon la connexion. Les démarrages suivants réutilisent le
+> volume `ollama_data` et sont immédiats. Pour suivre la progression du téléchargement du modèle, ouvrir un second
+> terminal et lancer `docker compose logs -f ollama`.
 L'override de développement monte le code et utilise `runserver`. Pour valider exactement la commande Gunicorn de
 production, sans charger cet override automatique :
 
@@ -70,18 +83,30 @@ Trois chemins sont prévus : Ollama sans clé et sans envoi des briefs hors de l
 quota gratuit limité, ou Mistral/OpenAI-compatible. Dans tous les cas, le worker est le seul service qui appelle le
 modèle.
 
-### Option locale légère : Ollama
+### Option locale légère : Ollama (par défaut)
 
-Le profil `ollama` est désactivé par défaut pour ne pas imposer son image et sa consommation aux contributeurs. Le
-modèle conseillé est [`qwen2.5:0.5b`](https://ollama.com/library/qwen2.5) : son fichier quantifié fait environ 398 Mo,
-comprend le français et sait produire du JSON. Cette taille privilégie la compatibilité avec un petit ordinateur ; la
-qualité sera moins régulière qu'avec un modèle distant plus grand.
+`.env.example` active `AI_PROVIDER=ollama` et `COMPOSE_PROFILES=ollama` : le profil Compose `ollama` démarre donc
+automatiquement, sans avoir besoin de passer `--profile ollama`. Le modèle conseillé est
+[`qwen2.5:0.5b`](https://ollama.com/library/qwen2.5) : son fichier quantifié fait environ 398 Mo, comprend le français
+et sait produire du JSON. Cette taille privilégie la compatibilité avec un petit ordinateur ; la qualité sera moins
+régulière qu'avec un modèle distant plus grand.
 
-Prévoir aussi plusieurs gigaoctets d'espace disque pour l'image Docker Ollama elle-même, en plus du modèle. Le port
-Ollama est publié uniquement sur `127.0.0.1` afin de ne pas exposer sans authentification son API au réseau local.
+Le conteneur `ollama` démarre son serveur puis **télécharge automatiquement `OLLAMA_MODEL` s'il est absent** avant de
+répondre aux requêtes ; aucune commande manuelle n'est nécessaire. Son healthcheck ne passe au vert que lorsque le
+modèle est réellement présent, et le `worker` attend cette même santé avant de traiter le premier brief — il n'y a
+donc pas de risque de tomber sur un brief en échec parce que le téléchargement est encore en cours. Prévoir plusieurs
+gigaoctets d'espace disque pour l'image Docker Ollama elle-même, en plus du modèle. Le port Ollama est publié
+uniquement sur `127.0.0.1` afin de ne pas exposer sans authentification son API au réseau local.
 
-Dans `.env`, changer uniquement le fournisseur ; les variables `OLLAMA_*` de `.env.example` constituent les valeurs
-prudentes par défaut :
+Il suffit donc de :
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Les variables `OLLAMA_*` de `.env.example` constituent les valeurs prudentes par défaut ; les changer dans `.env` si
+besoin :
 
 ```dotenv
 AI_PROVIDER=ollama
@@ -94,14 +119,6 @@ OLLAMA_MEMORY_LIMIT=2g
 OLLAMA_CPU_LIMIT=2.0
 ```
 
-Télécharger une seule fois le modèle, puis lancer toute la pile avec le profil :
-
-```bash
-docker compose --profile ollama up -d ollama
-docker compose --profile ollama exec ollama ollama pull qwen2.5:0.5b
-docker compose --profile ollama up --build
-```
-
 Le service est limité à un modèle chargé, une inférence à la fois, 2 CPU et 2 Go de mémoire. Le contexte de 4 096
 tokens et `keep_alive=1m` réduisent aussi la pression mémoire. Ces limites protègent l'hôte contre un emballement du
 conteneur, mais Docker, PostgreSQL, Redis et le système consomment encore de la mémoire : fermer les applications
@@ -109,11 +126,22 @@ lourdes et surveiller `docker stats` lors du premier essai. Si le port 11434 est
 `OLLAMA_BASE_URL` est utilisé entre les conteneurs.
 
 L'API native Ollama est appelée sans streaming avec un schéma JSON, conformément à la documentation des
-[sorties structurées Ollama](https://docs.ollama.com/capabilities/structured-outputs). Un 404 indique généralement que
-le modèle n'a pas encore été téléchargé. Pour arrêter sans supprimer le modèle :
+[sorties structurées Ollama](https://docs.ollama.com/capabilities/structured-outputs).
+
+> [!NOTE]
+> Cette configuration a été validée deux fois sur ce dépôt, y compris à froid (volume `ollama_data` vide, comme après
+> un `git clone`) : `docker compose up --build` a téléchargé le modèle automatiquement, puis un brief réel a été mis
+> en file, traité par `worker` et persisté avec le statut `completed` — 313 tokens annoncés, ~31 s de traitement sur un
+> poste sans GPU dédié. Un seul jeu d'essais ne remplace pas l'évaluation comparative prévue avant remise (voir
+> « Prochaines étapes »), mais confirme que `demo` peut être remplacé par un vrai modèle sans changement de code, dès
+> le premier `docker compose up --build` après un clone.
+
+Pour désactiver Ollama (par exemple pour utiliser uniquement Groq ou Mistral sans télécharger son image), retirer ou
+vider `COMPOSE_PROFILES` dans `.env` : le `worker` démarre alors sans l'attendre. Pour arrêter sans supprimer le
+modèle déjà téléchargé :
 
 ```bash
-docker compose --profile ollama down
+docker compose down
 ```
 
 ### Option avec clé et quota gratuit : Groq
@@ -345,16 +373,22 @@ Après déploiement :
 ### Qualité du modèle
 
 Le prompt impose cinq clés JSON, une température basse et sépare explicitement les données utilisateur des
-instructions. Ce format rend la sortie testable et directement affichable. Il faudra constituer un petit jeu de briefs
-représentatifs et noter la pertinence, la précision, le caractère actionnable et le taux de réponses invalides avant de
-choisir définitivement le modèle.
+instructions. Ce format rend la sortie testable et directement affichable. Un premier essai en local avec Ollama
+(`qwen2.5:0.5b`) a produit une réponse JSON valide dès la première tentative, avec une synthèse cohérente mais des
+listes assez courtes — attendu pour un modèle de 0,5 milliard de paramètres. Il faudra constituer un petit jeu de
+briefs représentatifs et noter la pertinence, la précision, le caractère actionnable et le taux de réponses invalides
+avant de choisir définitivement le modèle de production ; un modèle Ollama plus grand ou un fournisseur distant
+(Groq, Mistral) reste préférable pour la qualité finale, `qwen2.5:0.5b` étant surtout choisi pour tourner sans clé sur
+un petit poste.
 
 ### Coûts et quotas
 
 Chaque résultat conserve le nombre total de tokens annoncé par le fournisseur et la durée, ce qui permettra d'estimer
-le coût moyen. Les garde-fous actuels sont la taille d'entrée, un modèle configurable et la température faible. Restent à
-ajouter avant ouverture publique : quota par utilisateur, limite de débit, budget mensuel avec alerte et politique de
-nouvelle tentative plafonnée.
+le coût moyen. Le brief de validation avec Ollama a annoncé 327 tokens pour ~32 s de traitement sur un poste sans GPU
+dédié ; Ollama n'a pas de coût par token mais consomme du temps CPU du worker, ce qui devra être pris en compte si le
+volume de briefs augmente. Les garde-fous actuels sont la taille d'entrée, un modèle configurable et la température
+faible. Restent à ajouter avant ouverture publique : quota par utilisateur, limite de débit, budget mensuel avec alerte
+et politique de nouvelle tentative plafonnée.
 
 ### Difficultés traitées dans ce socle
 
@@ -366,9 +400,11 @@ nouvelle tentative plafonnée.
 
 ### Prochaines étapes
 
-- [ ] renseigner les noms complets de l'équipe ;
-- [ ] tester un vrai modèle et documenter l'évaluation comparative ;
+- [x] renseigner les noms complets de l'équipe ;
+- [x] valider un vrai modèle en local (Ollama `qwen2.5:0.5b`, brief traité de bout en bout) ;
+- [ ] documenter une évaluation comparative sur un jeu de briefs représentatif (Ollama vs Groq/Mistral) avant remise ;
 - [ ] ajouter relance contrôlée, suppression/export et quota par utilisateur ;
 - [ ] choisir le stockage objet si des pièces jointes sont ajoutées ;
 - [ ] déployer web, worker, PostgreSQL et Redis avec HTTPS ;
-- [ ] renseigner l'URL publique et compléter ce post-mortem avec des mesures réelles.
+- [ ] renseigner l'URL publique, y reproduire la configuration IA réelle et compléter ce post-mortem avec des mesures
+      issues de la production.
