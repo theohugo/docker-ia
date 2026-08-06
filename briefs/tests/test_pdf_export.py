@@ -1,9 +1,10 @@
 import tempfile
+from datetime import timedelta
 from unittest.mock import patch
 
-from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from briefs.models import AnalysisResult, ProjectBrief
 from briefs.services.pdf_export import generate_analysis_pdf
@@ -149,10 +150,8 @@ class PdfExportTests(TestCase):
 
     @patch("briefs.views.generate_analysis_pdf")
     def test_existing_pdf_is_reused(self, generate_pdf):
-        self.analysis.pdf_file.save(
-            "existing-export.pdf",
-            ContentFile(b"%PDF-existing-export"),
-        )
+        generate_analysis_pdf(self.analysis)
+        self.analysis.refresh_from_db()
         self.client.force_login(self.user)
 
         response = self.client.get(
@@ -167,3 +166,59 @@ class PdfExportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(pdf_content.startswith(b"%PDF"))
         generate_pdf.assert_not_called()
+
+    @patch(
+        "briefs.views.generate_analysis_pdf",
+        wraps=generate_analysis_pdf,
+    )
+    def test_stale_pdf_is_regenerated_after_analysis_update(
+        self,
+        generate_pdf,
+    ):
+        generate_analysis_pdf(self.analysis)
+        self.analysis.refresh_from_db()
+
+        previous_generated_at = self.analysis.pdf_generated_at
+
+        AnalysisResult.objects.filter(pk=self.analysis.pk).update(
+            summary="Une synthèse corrigée après la première génération.",
+            pdf_generated_at=timezone.now() - timedelta(minutes=5),
+            updated_at=timezone.now(),
+        )
+        self.analysis.refresh_from_db()
+
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse(
+                "briefs:download_pdf",
+                kwargs={"pk": self.brief.pk},
+            )
+        )
+
+        pdf_content = b"".join(response.streaming_content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(pdf_content.startswith(b"%PDF"))
+        generate_pdf.assert_called_once()
+
+        self.analysis.refresh_from_db()
+
+        self.assertGreater(
+            self.analysis.pdf_generated_at,
+            previous_generated_at,
+        )
+
+    def test_deleting_brief_deletes_stored_pdf(self):
+        generate_analysis_pdf(self.analysis)
+        self.analysis.refresh_from_db()
+
+        storage = self.analysis.pdf_file.storage
+        filename = self.analysis.pdf_file.name
+
+        self.assertTrue(storage.exists(filename))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.brief.delete()
+
+        self.assertFalse(storage.exists(filename))

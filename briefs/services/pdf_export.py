@@ -93,7 +93,6 @@ def generate_analysis_pdf(analysis: AnalysisResult) -> str:
         update_fields=[
             "pdf_file",
             "pdf_generated_at",
-            "updated_at",
         ]
     )
 

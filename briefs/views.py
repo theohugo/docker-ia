@@ -159,8 +159,9 @@ def download_pdf(request, pk):
     pdf_is_missing = not analysis.pdf_file or not analysis.pdf_file.storage.exists(
         analysis.pdf_file.name,
     )
+    pdf_is_stale = not analysis.pdf_generated_at or analysis.pdf_generated_at < analysis.updated_at
 
-    if pdf_is_missing:
+    if pdf_is_missing or pdf_is_stale:
         generate_analysis_pdf(analysis)
         analysis.refresh_from_db(
             fields=[
