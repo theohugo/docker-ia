@@ -2,7 +2,13 @@ import tempfile
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.db import connection
+from django.test import (
+    TestCase,
+    override_settings,
+    skipUnlessDBFeature,
+)
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -208,6 +214,66 @@ class PdfExportTests(TestCase):
             self.analysis.pdf_generated_at,
             previous_generated_at,
         )
+
+    @patch(
+        "briefs.views.generate_analysis_pdf",
+        wraps=generate_analysis_pdf,
+    )
+    def test_stale_pdf_is_regenerated_after_brief_update(
+        self,
+        generate_pdf,
+    ):
+        generate_analysis_pdf(self.analysis)
+        self.analysis.refresh_from_db()
+
+        previous_generated_at = self.analysis.pdf_generated_at
+
+        ProjectBrief.objects.filter(pk=self.brief.pk).update(
+            title="Projet PDF corrigé",
+            updated_at=timezone.now(),
+        )
+        self.brief.refresh_from_db()
+
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse(
+                "briefs:download_pdf",
+                kwargs={"pk": self.brief.pk},
+            )
+        )
+
+        pdf_content = b"".join(response.streaming_content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(pdf_content.startswith(b"%PDF"))
+        generate_pdf.assert_called_once()
+
+        self.analysis.refresh_from_db()
+
+        self.assertGreater(
+            self.analysis.pdf_generated_at,
+            previous_generated_at,
+        )
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_download_locks_brief_and_analysis_rows(self):
+        self.client.force_login(self.user)
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(
+                reverse(
+                    "briefs:download_pdf",
+                    kwargs={"pk": self.brief.pk},
+                )
+            )
+            b"".join(response.streaming_content)
+
+        locking_queries = [
+            query["sql"] for query in queries.captured_queries if "FOR UPDATE" in query["sql"].upper()
+        ]
+
+        self.assertGreaterEqual(len(locking_queries), 2)
 
     def test_deleting_brief_deletes_stored_pdf(self):
         generate_analysis_pdf(self.analysis)

@@ -142,45 +142,53 @@ def status(request, pk):
 def download_pdf(request, pk):
     """Generate and securely download the PDF owned by the current user."""
 
-    brief = get_object_or_404(
-        ProjectBrief.objects.select_related("analysis"),
-        pk=pk,
-        user=request.user,
-    )
-
-    if brief.status != ProjectBrief.Status.COMPLETED:
-        raise Http404("Cette analyse n'est pas terminée.")
-
-    try:
-        analysis: AnalysisResult = brief.analysis
-    except AnalysisResult.DoesNotExist as exc:
-        raise Http404("Aucun résultat n'est disponible.") from exc
-
-    pdf_is_missing = not analysis.pdf_file or not analysis.pdf_file.storage.exists(
-        analysis.pdf_file.name,
-    )
-    pdf_is_stale = not analysis.pdf_generated_at or analysis.pdf_generated_at < analysis.updated_at
-
-    if pdf_is_missing or pdf_is_stale:
-        generate_analysis_pdf(analysis)
-        analysis.refresh_from_db(
-            fields=[
-                "pdf_file",
-                "pdf_generated_at",
-            ]
+    with transaction.atomic():
+        brief = get_object_or_404(
+            ProjectBrief.objects.select_for_update(),
+            pk=pk,
+            user=request.user,
         )
 
-    if not analysis.pdf_file:
-        raise Http404("Le fichier PDF n'a pas pu être généré.")
+        if brief.status != ProjectBrief.Status.COMPLETED:
+            raise Http404("Cette analyse n'est pas terminée.")
 
-    safe_title = slugify(brief.title)[:60] or "brief"
-    download_name = f"cadria-{safe_title}.pdf"
+        analysis = get_object_or_404(
+            AnalysisResult.objects.select_for_update().select_related("brief"),
+            brief=brief,
+        )
 
-    analysis.pdf_file.open("rb")
+        pdf_is_missing = not analysis.pdf_file or not analysis.pdf_file.storage.exists(
+            analysis.pdf_file.name,
+        )
 
-    return FileResponse(
-        analysis.pdf_file,
-        as_attachment=True,
-        filename=download_name,
-        content_type="application/pdf",
-    )
+        latest_source_update = max(
+            analysis.updated_at,
+            brief.updated_at,
+        )
+        pdf_is_stale = not analysis.pdf_generated_at or analysis.pdf_generated_at < latest_source_update
+
+        if pdf_is_missing or pdf_is_stale:
+            generate_analysis_pdf(analysis)
+            analysis.refresh_from_db(
+                fields=[
+                    "pdf_file",
+                    "pdf_generated_at",
+                ]
+            )
+
+        if not analysis.pdf_file:
+            raise Http404("Le fichier PDF n'a pas pu être généré.")
+
+        safe_title = slugify(brief.title)[:60] or "brief"
+        download_name = f"cadria-{safe_title}.pdf"
+
+        analysis.pdf_file.open("rb")
+
+        response = FileResponse(
+            analysis.pdf_file,
+            as_attachment=True,
+            filename=download_name,
+            content_type="application/pdf",
+        )
+
+    return response
