@@ -375,6 +375,27 @@ class AnalyseBriefFallbackTests(SimpleTestCase):
         self.assertEqual(output.primary_error_code, "provider_unavailable")
         fallback.analyse.assert_called_once()
 
+    @override_settings(AI_FALLBACK_PROVIDER="ollama")
+    def test_fallback_is_used_when_primary_provider_cannot_be_constructed(self):
+        fallback = Mock()
+        fallback.name = "ollama"
+        fallback.model = "qwen2.5:0.5b"
+        fallback.analyse.return_value = fake_provider_response()
+
+        def fake_get_provider(name=None, model=None):
+            if name == "ollama":
+                return fallback
+            raise AIConfigurationError("AI_API_KEY is missing.")
+
+        with patch("briefs.services.analysis.get_provider", side_effect=fake_get_provider):
+            output = analyse_brief(brief_stub(provider="groq", model="openai/gpt-oss-20b"))
+
+        self.assertTrue(output.fallback_used)
+        self.assertEqual(output.provider, "ollama")
+        self.assertEqual(output.primary_provider, "groq")
+        self.assertEqual(output.primary_error_code, "configuration_error")
+        fallback.analyse.assert_called_once()
+
     @override_settings(AI_FALLBACK_PROVIDER="")
     def test_no_fallback_configured_reraises_primary_error(self):
         primary = Mock()

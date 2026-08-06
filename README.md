@@ -2,8 +2,9 @@
 
 > **Membres du groupe : Hugo Raguin · Amine Taleb · Rizlene Berrag**<br>
 > **Production : À COMPLÉTER — https://… (critère éliminatoire)**<br>
-> État : `docker compose up --build` démarre un vrai modèle IA (Ollama local, téléchargement automatique) prêt à
-> l'emploi ; déploiement public encore à renseigner.
+> État : `docker compose up --build` démarre un vrai modèle IA prêt à l'emploi (Ollama, sans clé) ; ajouter sa clé Groq
+> dans `.env` active le fournisseur nominal (meilleures réponses, plus rapide) — voir « Intégrer sa clé API ».
+> Déploiement public encore à renseigner.
 
 CadrIA transforme une idée de projet encore floue en un brief actionnable : synthèse, objectifs, livrables, risques et
 prochaines étapes. Chaque analyse est liée au compte qui l'a créée, exécutée hors de la requête HTTP par Celery, puis
@@ -19,11 +20,11 @@ et reprend les bonnes conventions d'architecture, de Docker et d'outillage du d�
 - création et validation serveur d'un brief ;
 - traitement asynchrone Celery via Redis ;
 - fournisseurs Mistral, Groq, OpenAI-compatible et Ollama local isolés derrière une interface ;
-- Ollama (`qwen2.5:0.5b`) actif par défaut : `docker compose up --build` télécharge le modèle automatiquement si
-  besoin et l'utilise réellement, sans commande manuelle ni clé — validé de bout en bout, y compris à froid sur un
-  volume vide ;
-- fournisseur de secours (`AI_FALLBACK_PROVIDER`, Groq par défaut) essayé automatiquement si le nominal échoue,
-  sans jamais faire échouer le brief à cause de ce mécanisme lui-même ;
+- Groq (`openai/gpt-oss-20b`) en fournisseur nominal dès qu'une clé est renseignée — validé en conditions réelles :
+  brief `completed`, ~900 ms, 728 tokens ;
+- Ollama (`qwen2.5:0.5b`) en fournisseur de secours actif par défaut, même sans clé Groq : `docker compose up --build`
+  télécharge son modèle automatiquement si besoin et l'utilise réellement — validé de bout en bout, y compris à froid
+  sur un volume vide et en tant que repli automatique quand Groq échoue ou n'est pas configuré ;
 - réponse JSON validée avant persistance dans PostgreSQL ;
 - mode `demo`, déterministe et sans réseau, conservé comme repli d'onboarding en changeant `AI_PROVIDER` ;
 - progression par polling, skeleton contextualisé et erreurs quota/authentification/réseau explicites ;
@@ -33,11 +34,13 @@ et reprend les bonnes conventions d'architecture, de Docker et d'outillage du d�
 - instructions partagées pour Codex (`AGENTS.md`) et Claude Code (`CLAUDE.md`, agents et skills locaux).
 
 > [!IMPORTANT]
-> `.env.example` a `AI_PROVIDER=ollama` par défaut : un `cp .env.example .env` suivi de `docker compose up --build`
-> suffit à obtenir un vrai modèle IA fonctionnel, sans clé. Le fournisseur `demo` reste disponible (changer
-> `AI_PROVIDER` dans `.env`) pour un onboarding encore plus léger, mais seul ne satisfait pas le critère éliminatoire
-> « intégration IA fonctionnelle ». Il reste à reproduire une configuration IA réelle (Ollama ou un fournisseur à clé)
-> sur l'URL publique une fois déployée, puis à remplacer le marqueur « À COMPLÉTER » placé en tête de ce README.
+> `.env.example` a `AI_PROVIDER=groq` (nominal) et `AI_FALLBACK_PROVIDER=ollama` (secours) par défaut. Sans clé Groq,
+> chaque brief bascule automatiquement sur Ollama, local et sans clé : `cp .env.example .env` suivi de
+> `docker compose up --build` suffit donc à obtenir un vrai modèle IA fonctionnel, avec ou sans clé. Ajouter une clé
+> Groq (voir « Intégrer sa clé API ») donne de meilleures réponses, plus vite. Le fournisseur `demo` reste disponible
+> (changer `AI_PROVIDER` dans `.env`) pour un onboarding encore plus léger, mais seul ne satisfait pas le critère
+> éliminatoire « intégration IA fonctionnelle ». Il reste à reproduire une configuration IA réelle sur l'URL publique
+> une fois déployée, puis à remplacer le marqueur « À COMPLÉTER » placé en tête de ce README.
 
 ## Démarrage rapide avec Docker
 
@@ -81,24 +84,71 @@ Ne pas ajouter `--volumes` sauf si la suppression de la base locale et de Redis 
 
 ## Brancher un vrai modèle IA
 
-CadrIA distingue un **fournisseur nominal** (celui qui traite les briefs normalement) et un **fournisseur de secours**
-optionnel, essayé automatiquement si le nominal échoue. Par défaut, `.env.example` configure :
+CadrIA distingue un **fournisseur nominal** (celui qui traite les briefs en priorité) et un **fournisseur de secours**,
+essayé automatiquement sur la même requête si le nominal échoue — indisponibilité, dépassement de temps, quota, clé
+manquante ou réponse invalide. Par défaut, `.env.example` configure :
 
-- **Nominal : Ollama**, en local, sans clé et sans envoi des briefs hors de la machine — suffit à lui seul à
-  satisfaire le critère « un vrai modèle IA traite effectivement une demande » ;
-- **Secours : Groq**, via `AI_FALLBACK_PROVIDER=groq`, mais **inactif tant qu'aucune clé n'est renseignée**. Sans clé,
-  tout fonctionne exactement comme si ce réglage n'existait pas — aucune action requise pour que le projet marche.
+- **Nominal : Groq** (`openai/gpt-oss-20b`) — réponses plus riches et nettement plus rapides (~1 s vs ~30 s en local),
+  mais nécessite une clé API personnelle ;
+- **Secours : Ollama** (`qwen2.5:0.5b`), en local, sans clé — prend automatiquement le relais si Groq échoue ou si
+  aucune clé n'est encore renseignée. C'est ce qui garantit qu'un clone tout juste récupéré, sans aucune clé
+  configurée, reste immédiatement fonctionnel et satisfait à lui seul le critère « un vrai modèle IA traite
+  effectivement une demande ».
 
-Mistral ou toute API compatible OpenAI peuvent aussi servir de fournisseur nominal à la place d'Ollama. Dans tous les
-cas, le worker est le seul service qui appelle le modèle.
+Mistral ou toute API compatible OpenAI peuvent aussi remplacer Groq comme fournisseur nominal. Dans tous les cas, le
+worker est le seul service qui appelle le modèle.
 
-### Fournisseur nominal : Ollama (par défaut)
+### Intégrer sa clé API (fournisseur nominal Groq)
 
-`.env.example` active `AI_PROVIDER=ollama` et `COMPOSE_PROFILES=ollama` : le profil Compose `ollama` démarre donc
-automatiquement, sans avoir besoin de passer `--profile ollama`. Le modèle conseillé est
-[`qwen2.5:0.5b`](https://ollama.com/library/qwen2.5) : son fichier quantifié fait environ 398 Mo, comprend le français
-et sait produire du JSON. Cette taille privilégie la compatibilité avec un petit ordinateur ; la qualité sera moins
-régulière qu'avec un modèle distant plus grand.
+Chaque personne (toi, un camarade, le prof) utilise **sa propre clé**, jamais partagée via Git — une clé API
+authentifie un compte, pas le dépôt. Sans clé, le projet fonctionne quand même : chaque brief bascule automatiquement
+sur le secours Ollama (voir plus bas), simplement avec des réponses plus modestes et plus lentes.
+
+Étapes, après avoir cloné le dépôt :
+
+1. Créer une clé dans la [console Groq](https://console.groq.com/keys) (compte gratuit).
+2. Créer son `.env` s'il n'existe pas encore :
+   ```bash
+   cp .env.example .env
+   ```
+3. Ouvrir `.env` (jamais `.env.example`) et renseigner uniquement :
+   ```dotenv
+   AI_API_KEY=votre-cle-groq-locale
+   ```
+   `AI_PROVIDER=groq` et `AI_FALLBACK_PROVIDER=ollama` sont déjà positionnés par défaut — c'est la seule ligne à
+   toucher.
+4. Démarrer (ou recharger) la pile :
+   ```bash
+   docker compose up --build
+   ```
+   Si la pile tournait déjà sans clé, `docker compose up -d` suffit et recrée uniquement `worker` : une variable
+   d'environnement n'est lue qu'à la création du conteneur, pas par un process déjà démarré.
+
+Rien d'autre à faire : Groq devient actif dès le brief suivant, sans redémarrage applicatif ni action utilisateur.
+`brief.provider`/`brief.model` et le pied de page de l'analyse reflètent toujours le fournisseur qui a réellement
+répondu ; le journal (`GenerationEvent`) conserve `fallback_used`, `primary_provider` et `primary_error_code` pour
+l'audit.
+
+Au 5 août 2026, Groq documente un **Free Plan** et inclut `openai/gpt-oss-20b` dans ses
+[limites gratuites](https://console.groq.com/docs/rate-limits). Ce quota est soumis à des limites de requêtes et de
+tokens et peut évoluer : ce n'est ni une gratuité permanente ni une garantie de capacité. Une réponse HTTP 429 est
+restituée comme un quota atteint, sans exposer la réponse brute à l'utilisateur.
+
+> [!NOTE]
+> Comportement validé de bout en bout dans les deux sens. **Sans clé** : le worker tente Groq, échoue proprement
+> (`configuration_error`, clé manquante), puis bascule sur Ollama qui traite le brief avec succès (`completed`,
+> `fallback_used=True`, `primary_provider=groq`) — aucun blocage. **Avec une vraie clé Groq** : le même scénario produit
+> un aller-retour réseau réel et réussi, sans passer par le secours (`fallback_used=False`) — brief `completed`,
+> `provider=groq`, `model=openai/gpt-oss-20b`, 728 tokens annoncés, ~0,9 s. Une coupure volontaire d'Ollama pendant
+> qu'il était nominal a aussi été testée : bascule vers Groq réussie, 698 tokens, ~9,7 s.
+
+### Fournisseur de secours : Ollama, local et sans clé
+
+`.env.example` active `AI_FALLBACK_PROVIDER=ollama` et `COMPOSE_PROFILES=ollama` : le profil Compose `ollama` démarre
+donc automatiquement, sans avoir besoin de passer `--profile ollama` — que Groq soit configuré ou non. Le modèle
+utilisé est [`qwen2.5:0.5b`](https://ollama.com/library/qwen2.5) : son fichier quantifié fait environ 398 Mo, comprend
+le français et sait produire du JSON. Cette taille privilégie la compatibilité avec un petit ordinateur ; la qualité
+sera moins régulière qu'avec Groq.
 
 Le conteneur `ollama` démarre son serveur puis **télécharge automatiquement `OLLAMA_MODEL` s'il est absent** avant de
 répondre aux requêtes ; aucune commande manuelle n'est nécessaire. Son healthcheck ne passe au vert que lorsque le
@@ -107,18 +157,18 @@ donc pas de risque de tomber sur un brief en échec parce que le téléchargemen
 gigaoctets d'espace disque pour l'image Docker Ollama elle-même, en plus du modèle. Le port Ollama est publié
 uniquement sur `127.0.0.1` afin de ne pas exposer sans authentification son API au réseau local.
 
-Il suffit donc de :
+Sans aucune clé configurée, il suffit donc de :
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-Les variables `OLLAMA_*` de `.env.example` constituent les valeurs prudentes par défaut ; les changer dans `.env` si
-besoin :
+pour obtenir un vrai modèle IA fonctionnel — Ollama traite alors tous les briefs en tant que secours. Les variables
+`OLLAMA_*` de `.env.example` constituent les valeurs prudentes par défaut ; les changer dans `.env` si besoin :
 
 ```dotenv
-AI_PROVIDER=ollama
+AI_FALLBACK_PROVIDER=ollama
 OLLAMA_BASE_URL=http://ollama:11434
 OLLAMA_MODEL=qwen2.5:0.5b
 OLLAMA_TIMEOUT_SECONDS=120
@@ -135,69 +185,26 @@ lourdes et surveiller `docker stats` lors du premier essai. Si le port 11434 est
 `OLLAMA_BASE_URL` est utilisé entre les conteneurs.
 
 L'API native Ollama est appelée sans streaming avec un schéma JSON, conformément à la documentation des
-[sorties structurées Ollama](https://docs.ollama.com/capabilities/structured-outputs).
+[sorties structurées Ollama](https://docs.ollama.com/capabilities/structured-outputs). `AI_PROVIDER=ollama` fonctionne
+aussi comme fournisseur nominal à part entière (au lieu de Groq), sans rien changer d'autre.
 
 > [!NOTE]
-> Cette configuration a été validée deux fois sur ce dépôt, y compris à froid (volume `ollama_data` vide, comme après
-> un `git clone`) : `docker compose up --build` a téléchargé le modèle automatiquement, puis un brief réel a été mis
-> en file, traité par `worker` et persisté avec le statut `completed` — 313 tokens annoncés, ~31 s de traitement sur un
-> poste sans GPU dédié. Un seul jeu d'essais ne remplace pas l'évaluation comparative prévue avant remise (voir
-> « Prochaines étapes »), mais confirme que `demo` peut être remplacé par un vrai modèle sans changement de code, dès
-> le premier `docker compose up --build` après un clone.
+> Ce chemin a été validé deux fois de bout en bout, y compris à froid (volume `ollama_data` vide, comme après un
+> `git clone`) : `docker compose up --build` a téléchargé le modèle automatiquement, puis un brief réel a été mis en
+> file, traité par `worker` et persisté avec le statut `completed` — 313 tokens annoncés, ~31 s de traitement sur un
+> poste sans GPU dédié.
 
-Pour désactiver Ollama (par exemple pour utiliser uniquement Groq ou Mistral sans télécharger son image), retirer ou
-vider `COMPOSE_PROFILES` dans `.env` : le `worker` démarre alors sans l'attendre. Pour arrêter sans supprimer le
-modèle déjà téléchargé :
+Pour désactiver Ollama entièrement (par exemple pour ne garder que Groq, sans filet), retirer ou vider
+`COMPOSE_PROFILES` dans `.env` et `AI_FALLBACK_PROVIDER` : le `worker` démarre alors sans l'attendre. Pour arrêter
+sans supprimer le modèle déjà téléchargé :
 
 ```bash
 docker compose down
 ```
 
-### Fournisseur de secours (backup) : activer Groq
-
-`AI_FALLBACK_PROVIDER` définit un second fournisseur essayé automatiquement, pour la même requête, si le nominal
-échoue — indisponibilité, dépassement de temps, quota ou réponse invalide. `.env.example` a déjà
-`AI_FALLBACK_PROVIDER=groq` : il ne manque qu'une clé pour l'activer. Chaque personne (toi, un camarade, le prof)
-utilise **sa propre clé**, jamais partagée via Git — une clé API authentifie un compte, pas le dépôt.
-
-Pour l'activer :
-
-1. Créer une clé dans la [console Groq](https://console.groq.com/keys) (compte gratuit).
-2. Dans `.env` (jamais `.env.example`), renseigner uniquement :
-   ```dotenv
-   AI_API_KEY=votre-cle-groq-locale
-   ```
-   `AI_PROVIDER=ollama` et `AI_FALLBACK_PROVIDER=groq` restent tels quels — c'est la seule ligne à toucher.
-3. Recharger les conteneurs pour que la variable soit prise en compte (une variable d'environnement n'est lue qu'à la
-   création du conteneur, pas par un `worker` déjà démarré) :
-   ```bash
-   docker compose up -d
-   ```
-
-Rien d'autre à faire : le secours se déclenche de lui-même dès qu'Ollama échoue, sans redémarrage manuel ni action
-utilisateur. Sans clé, le secours échoue silencieusement à son tour et l'erreur d'origine du fournisseur nominal est
-celle renvoyée — comme si `AI_FALLBACK_PROVIDER` était vide. `brief.provider`/`brief.model` et le pied de page de
-l'analyse reflètent toujours le fournisseur qui a réellement répondu ; le journal (`GenerationEvent`) conserve
-`fallback_used`, `primary_provider` et `primary_error_code` pour l'audit.
-
-Au 5 août 2026, Groq documente un **Free Plan** et inclut `openai/gpt-oss-20b` dans ses
-[limites gratuites](https://console.groq.com/docs/rate-limits). Ce quota est soumis à des limites de requêtes et de
-tokens et peut évoluer : ce n'est ni une gratuité permanente ni une garantie de capacité. Une réponse HTTP 429 est
-restituée comme un quota atteint, sans exposer la réponse brute à l'utilisateur. `AI_PROVIDER=groq` fonctionne aussi
-comme fournisseur nominal à part entière (au lieu d'Ollama), avec la même clé.
-
-> [!NOTE]
-> Comportement validé à deux niveaux en coupant volontairement `ollama` (`docker compose stop ollama`) avec
-> `AI_FALLBACK_PROVIDER=groq` : sans `AI_API_KEY`, le worker tente Groq à chaque tentative (initiale + 2 relances),
-> échoue proprement faute de clé, puis restitue l'erreur d'origine du principal (`provider_unavailable`) — aucun
-> blocage, aucune fuite de détail interne. Avec une vraie clé Groq renseignée, le même scénario a produit un aller-retour
-> réseau réel et réussi : brief `completed`, `provider=groq`, `model=openai/gpt-oss-20b`, 698 tokens annoncés, ~9,7 s —
-> nettement plus rapide que l'inférence locale sur `qwen2.5:0.5b`. Le journal (`GenerationEvent`) a bien enregistré
-> `fallback_used=True` et `primary_provider=ollama`.
-
 ### Autre fournisseur nominal : Mistral ou API compatible OpenAI
 
-Le premier fournisseur cible est Mistral. Modifier uniquement le fichier local `.env` :
+Mistral peut remplacer Groq comme fournisseur nominal. Modifier uniquement le fichier local `.env` :
 
 ```dotenv
 AI_PROVIDER=mistral
@@ -407,22 +414,22 @@ Après déploiement :
 ### Qualité du modèle
 
 Le prompt impose cinq clés JSON, une température basse et sépare explicitement les données utilisateur des
-instructions. Ce format rend la sortie testable et directement affichable. Un premier essai en local avec Ollama
-(`qwen2.5:0.5b`) a produit une réponse JSON valide dès la première tentative, avec une synthèse cohérente mais des
-listes assez courtes — attendu pour un modèle de 0,5 milliard de paramètres. Il faudra constituer un petit jeu de
-briefs représentatifs et noter la pertinence, la précision, le caractère actionnable et le taux de réponses invalides
-avant de choisir définitivement le modèle de production ; un modèle Ollama plus grand ou un fournisseur distant
-(Groq, Mistral) reste préférable pour la qualité finale, `qwen2.5:0.5b` étant surtout choisi pour tourner sans clé sur
-un petit poste.
+instructions. Ce format rend la sortie testable et directement affichable. Les deux fournisseurs par défaut ont été
+comparés sur le même brief : Groq (`openai/gpt-oss-20b`) produit des listes plus riches et détaillées quasi
+instantanément, tandis qu'Ollama (`qwen2.5:0.5b`) reste cohérent mais avec des listes plus courtes — attendu pour un
+modèle de 0,5 milliard de paramètres tournant sans GPU. C'est précisément pourquoi Groq est le nominal et Ollama le
+secours : la qualité par défaut est la meilleure disponible sans clé partagée, tout en gardant un filet local. Il
+faudra constituer un petit jeu de briefs représentatifs et noter la pertinence, la précision, le caractère actionnable
+et le taux de réponses invalides avant de choisir définitivement le modèle de production.
 
 ### Coûts et quotas
 
 Chaque résultat conserve le nombre total de tokens annoncé par le fournisseur et la durée, ce qui permettra d'estimer
-le coût moyen. Le brief de validation avec Ollama a annoncé 327 tokens pour ~32 s de traitement sur un poste sans GPU
-dédié ; Ollama n'a pas de coût par token mais consomme du temps CPU du worker, ce qui devra être pris en compte si le
-volume de briefs augmente. Les garde-fous actuels sont la taille d'entrée, un modèle configurable et la température
-faible. Restent à ajouter avant ouverture publique : quota par utilisateur, limite de débit, budget mensuel avec alerte
-et politique de nouvelle tentative plafonnée.
+le coût moyen. Sur le même brief, Groq a annoncé 728 tokens en ~0,9 s contre 327 tokens en ~32 s pour Ollama sur un
+poste sans GPU dédié. Ollama n'a pas de coût par token mais consomme du temps CPU du worker ; Groq est soumis au quota
+gratuit de la console (voir « Intégrer sa clé API »). Les garde-fous actuels sont la taille d'entrée, un modèle
+configurable et la température faible. Restent à ajouter avant ouverture publique : quota par utilisateur, limite de
+débit, budget mensuel avec alerte et politique de nouvelle tentative plafonnée.
 
 ### Difficultés traitées dans ce socle
 
@@ -435,8 +442,10 @@ et politique de nouvelle tentative plafonnée.
 ### Prochaines étapes
 
 - [x] renseigner les noms complets de l'équipe ;
-- [x] valider un vrai modèle en local (Ollama `qwen2.5:0.5b`, brief traité de bout en bout) ;
-- [ ] documenter une évaluation comparative sur un jeu de briefs représentatif (Ollama vs Groq/Mistral) avant remise ;
+- [x] valider les deux fournisseurs par défaut de bout en bout (Groq nominal avec clé, Ollama en secours sans clé,
+      bascule automatique testée dans les deux sens) ;
+- [ ] documenter une évaluation comparative sur un jeu de briefs représentatif (Groq vs Ollama vs Mistral) avant
+      remise ;
 - [ ] ajouter relance contrôlée, suppression/export et quota par utilisateur ;
 - [ ] choisir le stockage objet si des pièces jointes sont ajoutées ;
 - [ ] déployer web, worker, PostgreSQL et Redis avec HTTPS ;
