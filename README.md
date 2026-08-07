@@ -1,10 +1,11 @@
 # CadrIA — copilote de brief propulsé par Django & IA
 
 > **Membres du groupe : Hugo Raguin · Amine Taleb · Rizlene Berrag**<br>
-> **Production : À COMPLÉTER — https://… (critère éliminatoire)**<br>
+> **Production : https://ia.theoxeu.com**<br>
 > État : `docker compose up --build` démarre un vrai modèle IA prêt à l'emploi (Ollama, sans clé) ; ajouter sa clé Groq
 > dans `.env` active le fournisseur nominal (meilleures réponses, plus rapide) — voir « Intégrer sa clé API ».
-> Déploiement public encore à renseigner.
+> L'instance publique tourne derrière Traefik en HTTPS et sert des analyses réelles via Ollama (`qwen2.5:0.5b`),
+> environ 10 s par brief.
 
 CadrIA transforme une idée de projet encore floue en un brief actionnable : synthèse, objectifs, livrables, risques et
 prochaines étapes. Chaque analyse est liée au compte qui l'a créée, exécutée hors de la requête HTTP par Celery, puis
@@ -39,8 +40,9 @@ et reprend les bonnes conventions d'architecture, de Docker et d'outillage du d�
 > `docker compose up --build` suffit donc à obtenir un vrai modèle IA fonctionnel, avec ou sans clé. Ajouter une clé
 > Groq (voir « Intégrer sa clé API ») donne de meilleures réponses, plus vite. Le fournisseur `demo` reste disponible
 > (changer `AI_PROVIDER` dans `.env`) pour un onboarding encore plus léger, mais seul ne satisfait pas le critère
-> éliminatoire « intégration IA fonctionnelle ». Il reste à reproduire une configuration IA réelle sur l'URL publique
-> une fois déployée, puis à remplacer le marqueur « À COMPLÉTER » placé en tête de ce README.
+> éliminatoire « intégration IA fonctionnelle ». C'est bien une configuration IA réelle qui tourne sur
+> https://ia.theoxeu.com : le fournisseur nominal y est `groq` et, tant qu'aucune clé n'y est renseignée, chaque brief
+> bascule automatiquement sur Ollama `qwen2.5:0.5b` — jamais sur `demo`.
 
 ## Export PDF sécurisé
 
