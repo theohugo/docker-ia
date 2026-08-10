@@ -31,8 +31,29 @@
                 <p class="mini-label">Bibliothèque</p>
                 <h2 id="library-title">Vos briefs récents</h2>
             </div>
-            {% if briefs %}<span class="count-label">{{ brief_count }} résultat{{ brief_count|pluralize }}</span>{% endif %}
+            {% if brief_count %}<span class="count-label">{{ result_count }} résultat{{ result_count|pluralize }}</span>{% endif %}
         </div>
+
+        {% if brief_count %}
+            <form class="library-tools" method="get" role="search" aria-label="Rechercher dans vos briefs">
+                <label class="library-search" for="brief-search">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg>
+                    <span class="sr-only">Rechercher un brief</span>
+                    <input id="brief-search" name="q" type="search" value="{{ active_query }}" placeholder="Titre ou contenu du brief…" autocomplete="off">
+                </label>
+                <label class="library-status" for="brief-status">
+                    <span>État</span>
+                    <select id="brief-status" name="status">
+                        <option value="">Tous les états</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}"{% if active_status == value %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button class="button button--secondary button--small" type="submit">Filtrer</button>
+                {% if active_query or active_status %}<a class="button button--ghost button--small" href="{% url 'dashboard' %}">Effacer</a>{% endif %}
+            </form>
+        {% endif %}
 
         {% if briefs %}
             <div class="brief-list">
@@ -63,11 +84,21 @@
 
             {% if is_paginated %}
                 <nav class="pagination" aria-label="Pagination des briefs">
-                    {% if page_obj.has_previous %}<a class="button button--ghost button--small" href="?page={{ page_obj.previous_page_number }}">Précédente</a>{% endif %}
+                    {% if page_obj.has_previous %}<a class="button button--ghost button--small" href="?{% if filter_querystring %}{{ filter_querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Précédente</a>{% endif %}
                     <span>Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}</span>
-                    {% if page_obj.has_next %}<a class="button button--ghost button--small" href="?page={{ page_obj.next_page_number }}">Suivante</a>{% endif %}
+                    {% if page_obj.has_next %}<a class="button button--ghost button--small" href="?{% if filter_querystring %}{{ filter_querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Suivante</a>{% endif %}
                 </nav>
             {% endif %}
+        {% elif brief_count %}
+            <div class="empty-state empty-state--filtered">
+                <div class="empty-illustration" aria-hidden="true">
+                    <svg viewBox="0 0 150 126"><circle cx="64" cy="55" r="29"/><path d="m85 77 26 26M51 55h26"/></svg>
+                </div>
+                <p class="mini-label">Aucun résultat</p>
+                <h3>Essayez une recherche plus large.</h3>
+                <p>Modifiez le texte recherché ou affichez tous les états pour retrouver votre brief.</p>
+                <a class="button button--primary" href="{% url 'dashboard' %}">Afficher tous les briefs</a>
+            </div>
         {% else %}
             <div class="empty-state">
                 <div class="empty-illustration" aria-hidden="true">

@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -22,15 +23,35 @@ from .tasks import enqueue_brief_generation
 @login_required
 def dashboard(request):
     queryset = ProjectBrief.objects.filter(user=request.user).select_related("analysis")
+    total_count = queryset.count()
+    active_query = request.GET.get("q", "").strip()[:120]
+    requested_status = request.GET.get("status", "")
+    valid_statuses = {value for value, _label in ProjectBrief.Status.choices}
+    active_status = requested_status if requested_status in valid_statuses else ""
+
+    if active_query:
+        queryset = queryset.filter(
+            Q(title__icontains=active_query) | Q(raw_idea__icontains=active_query)
+        )
+    if active_status:
+        queryset = queryset.filter(status=active_status)
+
     paginator = Paginator(queryset, 12)
     page_obj = paginator.get_page(request.GET.get("page"))
+    filter_params = request.GET.copy()
+    filter_params.pop("page", None)
 
     return render(
         request,
         "briefs/dashboard.html",
         {
             "briefs": page_obj,
-            "brief_count": paginator.count,
+            "brief_count": total_count,
+            "result_count": paginator.count,
+            "active_query": active_query,
+            "active_status": active_status,
+            "status_choices": ProjectBrief.Status.choices,
+            "filter_querystring": filter_params.urlencode(),
             "is_paginated": page_obj.has_other_pages(),
             "page_obj": page_obj,
         },

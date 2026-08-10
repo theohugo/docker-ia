@@ -39,6 +39,36 @@ class BriefViewTests(TestCase):
         self.assertEqual(first_page.context["brief_count"], 13)
         self.assertEqual(len(second_page.context["briefs"]), 1)
 
+    def test_dashboard_searches_owned_briefs_by_title_or_idea(self):
+        title_match = make_brief(
+            self.user,
+            title="Refonte du portail",
+            raw_idea="Centraliser les documents des équipes.",
+        )
+        idea_match = make_brief(self.user, title="Assistant interne", raw_idea="Simplifier le support client")
+        make_brief(self.user, title="Projet sans rapport", raw_idea="Organiser les congés")
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("dashboard"), {"q": "portail"})
+        self.assertQuerySetEqual(response.context["briefs"], [title_match])
+
+        response = self.client.get(reverse("dashboard"), {"q": "support"})
+        self.assertQuerySetEqual(response.context["briefs"], [idea_match])
+        self.assertEqual(response.context["active_query"], "support")
+
+    def test_dashboard_filters_by_status_and_ignores_unknown_status(self):
+        completed = make_brief(self.user, title="Brief prêt", status=ProjectBrief.Status.COMPLETED)
+        make_brief(self.user, title="Brief en cours", status=ProjectBrief.Status.PROCESSING)
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("dashboard"), {"status": ProjectBrief.Status.COMPLETED})
+        self.assertQuerySetEqual(response.context["briefs"], [completed])
+        self.assertEqual(response.context["active_status"], ProjectBrief.Status.COMPLETED)
+
+        response = self.client.get(reverse("dashboard"), {"status": "not-a-status"})
+        self.assertEqual(response.context["brief_count"], 2)
+        self.assertEqual(response.context["active_status"], "")
+
     def test_detail_hides_another_users_brief(self):
         brief = make_brief(make_user("someone-else"))
         self.client.force_login(self.user)
