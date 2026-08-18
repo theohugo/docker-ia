@@ -213,3 +213,47 @@ def download_pdf(request, pk):
         )
 
     return response
+
+
+@require_GET
+@login_required
+def download_markdown(request, pk):
+    """Generate and download a Markdown file of the brief."""
+    from django.http import HttpResponse
+
+    brief = get_object_or_404(ProjectBrief, pk=pk, user=request.user)
+    if brief.status != ProjectBrief.Status.COMPLETED:
+        raise Http404("Cette analyse n'est pas terminée.")
+    analysis = get_object_or_404(AnalysisResult, brief=brief)
+
+    content = [
+        f"# {brief.title}",
+        "",
+        f"> Brief généré par CadrIA ({brief.created_at.strftime('%d/%m/%Y')})",
+        "",
+        "## 1. Synthèse",
+        analysis.summary,
+        "",
+        "## 2. Objectifs",
+    ]
+    for obj in (analysis.objectives or []):
+        content.append(f"- {obj}")
+    content.append("")
+    content.append("## 3. Livrables")
+    for d in (analysis.deliverables or []):
+        content.append(f"- {d}")
+    content.append("")
+    content.append("## 4. Risques & Mitigations")
+    for r in (analysis.risks or []):
+        content.append(f"- {r}")
+    content.append("")
+    content.append("## 5. Prochaines Étapes")
+    for s in (analysis.next_steps or []):
+        content.append(f"- {s}")
+    content.append("")
+
+    md_text = "\n".join(content)
+    safe_title = slugify(brief.title)[:60] or "brief"
+    response = HttpResponse(md_text, content_type="text/markdown; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="cadria-{safe_title}.md"'
+    return response
